@@ -37,11 +37,22 @@ class Collector(object):
 
                 credential = None
                 if entity_info["protocols"][protocol]["credential"]:
-                    credential_id = entity_info["protocols"]["snmp"]["credential"]
+                    credential_id = entity_info["protocols"][protocol]["credential"]
                     r = requests.get('{}/accounts/{}/credentials/{}?b={}'.format(self.backend_url, account_id, credential_id, self.bot_token))
                     if r.status_code != 200:
                         raise Exception("Network error, got status {} while retrieving {}/accounts/{}/credentials/{}".format(r.status_code, self.backend_url, account_id, credential_id))
                     credential = r.json()
+
+                sensors = []
+                for sensor in entity_info["protocols"][protocol]["sensors"]:
+                    r = requests.get('{}/accounts/{}/sensors/{}?b={}'.format(self.backend_url, account_id, sensor["sensor"], self.bot_token))
+                    if r.status_code != 200:
+                        raise Exception("Network error, got status {} while retrieving {}/accounts/{}/sensors/{}".format(r.status_code, self.backend_url, account_id, sensor["sensor"]))
+                    sensors.append({
+                        "sensor": r.json(),
+                        "interval": sensor["interval"],
+                    })
+                entity_info["protocols"][protocol]["sensors"] = sensors
 
                 yield account_id, entity_info, credential
 
