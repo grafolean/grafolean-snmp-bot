@@ -32,6 +32,11 @@ class Collector(object):
                 # make sure that the protocol is enabled on the entity:
                 if protocol not in entity_info["protocols"]:
                     continue
+                # and hide all other protocols: (not strictly necessary, just cleaner)
+                entity_info["protocols"] = {
+                    protocol: entity_info["protocols"][protocol]
+                }
+
                 if not entity_info["protocols"][protocol]["sensors"]:
                     continue
 
@@ -64,7 +69,9 @@ class SNMPCollector(Collector):
 
     def init(self):
         for account_id, entity_info, credential in self.fetch_accounts_entities('snmp'):
-            pass
+            # print(account_id, entity_info, credential)
+            import json
+            print(json.dumps(entity_info))
 
     def execute(self):
         pass
