@@ -1,4 +1,3 @@
-from apscheduler.schedulers.blocking import BlockingScheduler
 import os
 import dotenv
 import logging
@@ -25,7 +24,7 @@ class SNMPCollector(Collector):
     def do_snmp(*args, **entity_info):
         """
             {
-                "id": 1348300224,
+                "entity_id": 1348300224,
                 "name": "localhost",
                 "entity_type": "device",
                 "details": {
@@ -66,13 +65,20 @@ class SNMPCollector(Collector):
                 "account_id": 1
             }
         """
-        # log.info("Running job for account [{account_id}], IP [{ipv4}], OIDS: {oids}".format(
-        #     account_id=account_id,
-        #     ipv4=entity["ipv4"],
-        #     oids=["SNMP{} {}".format(o["fetch_method"].upper(), o["oid"]) for o in sensor["oids"]],
-        # ))
+        # filter out only those sensors that are supposed to run at this interval:
         affecting_intervals, = args
-        log.info("Running: {} {}".format(affecting_intervals, json.dumps(entity_info)))
+        sensors = [s for s in entity_info["sensors"] if s["interval"] in affecting_intervals]
+        oids = []
+        for sensor in sensors:
+            oids.extend(sensor["sensor_details"]["oids"])
+        log.info("Running job for account [{account_id}], IP [{ipv4}], nsensors: {n_sensors}, oids: {oids}".format(
+            account_id=entity_info["account_id"],
+            ipv4=entity_info["details"]["ipv4"],
+            n_sensors=len(sensors),
+            oids=["SNMP{} {}".format(o["fetch_method"].upper(), o["oid"]) for o in oids],
+        ))
+
+
 
     def jobs(self):
         """

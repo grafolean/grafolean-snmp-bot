@@ -241,6 +241,8 @@ class Collector(object):
                 del entity_info["protocols"]
 
                 entity_info["account_id"] = account_id
+                entity_info["entity_id"] = entity_info["id"]
+                del entity_info["id"]
 
                 yield entity_info
 
