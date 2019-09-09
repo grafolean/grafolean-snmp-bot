@@ -5,6 +5,7 @@ import json
 from pytz import utc
 from colors import color
 
+from easysnmp import Session
 
 from collector import Collector
 
@@ -67,16 +68,55 @@ class SNMPCollector(Collector):
         """
         # filter out only those sensors that are supposed to run at this interval:
         affecting_intervals, = args
-        sensors = [s for s in entity_info["sensors"] if s["interval"] in affecting_intervals]
-        oids = []
-        for sensor in sensors:
-            oids.extend(sensor["sensor_details"]["oids"])
-        log.info("Running job for account [{account_id}], IP [{ipv4}], nsensors: {n_sensors}, oids: {oids}".format(
-            account_id=entity_info["account_id"],
-            ipv4=entity_info["details"]["ipv4"],
-            n_sensors=len(sensors),
-            oids=["SNMP{} {}".format(o["fetch_method"].upper(), o["oid"]) for o in oids],
-        ))
+
+        # initialize session:
+        session_kwargs = {
+            "hostname": entity_info["details"]["ipv4"],
+            "use_numeric": True,
+        }
+        cred = entity_info["credential_details"]
+        snmp_version = int(cred["version"][5:6])
+        session_kwargs["version"] = snmp_version
+        if snmp_version in [1, 2]:
+            session_kwargs["community"] = cred["snmpv12_community"]
+        elif snmp_version == 3:
+            session_kwargs = {
+                **session_kwargs,
+                "security_username": cred["snmpv3_securityName"],
+                "security_level": cred["snmpv3_securityLevel"],  # easysnmp supports camelCase level names too
+                "privacy_protocol": cred.get("snmpv3_privProtocol", 'DEFAULT'),
+                "privacy_password": cred.get("snmpv3_privKey", ''),
+                "auth_protocol": cred.get("snmpv3_authProtocol", 'DEFAULT'),
+                "auth_password": cred.get("snmpv3_authKey", ''),
+            }
+        else:
+            raise Exception("Invalid SNMP version")
+
+        session = Session(**session_kwargs)
+
+
+        activated_sensors = [s for s in entity_info["sensors"] if s["interval"] in affecting_intervals]
+        for sensor in activated_sensors:
+            results = []
+            oids = [o["oid"] for o in sensor["sensor_details"]["oids"]]
+            methods = [o["fetch_method"] for o in sensor["sensor_details"]["oids"]]
+            for oid, fetch_method in zip(oids, methods):
+                if fetch_method == 'get':
+                    result = session.get(oid)
+                    results.append(result)
+                else:
+                    result = session.walk(oid)
+                    results.append(result)
+            log.info("Results: {}".format(list(zip(oids, methods, results))))
+
+
+        # log.info("Running job for account [{account_id}], IP [{ipv4}], nsensors: {n_sensors}, oids: {oids}".format(
+        #     account_id=entity_info["account_id"],
+        #     ipv4=entity_info["details"]["ipv4"],
+        #     n_sensors=len(sensors),
+        #     oids=["SNMP{} {}".format(o["fetch_method"].upper(), o["oid"]) for o in oids],
+        # ))
+
 
 
 
