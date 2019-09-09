@@ -1,7 +1,7 @@
-from apscheduler.schedulers.blocking import BlockingScheduler
 import os
 import dotenv
 import logging
+import json
 from pytz import utc
 from colors import color
 
@@ -19,71 +19,76 @@ log = logging.getLogger("{}.{}".format(__name__, "base"))
 
 
 class SNMPCollector(Collector):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.jobs_configs = []
-        for account_id, entity_info in self.fetch_job_configs('snmp'):
-            # convert entity_info into easy-to-use task definitions:
-            for sensor_info in entity_info["sensors"]:
-                self.jobs_configs.append({
-                    "account_id": account_id,
-                    "entity": entity_info["details"],
-                    "sensor": sensor_info["sensor_details"],
-                    "interval": sensor_info["interval"],
-                    "credential": entity_info["credential_details"],
-                })
-
-            # >>> import json
-            # >>> print(json.dumps(self.jobs_configs))
-            # [
-            #     {
-            #         "account_id": 1,
-            #         "entity": {
-            #             "ipv4": "127.0.0.1"
-            #         },
-            #         "sensor": {
-            #             "oids": [
-            #                 {
-            #                     "oid": "1.3.6.1.4.1.2021.13.16.2.1.3",
-            #                     "fetch_method": "get"
-            #                 }
-            #             ],
-            #             "expression": "$1",
-            #             "output_path": "lm-sensors"
-            #         },
-            #         "interval": 30,
-            #         "credential": {
-            #             "version": "snmpv1",
-            #             "snmpv12_community": "public"
-            #         }
-            #     }
-            # ]
 
     @staticmethod
-    def do_snmp(account_id, entity, sensor, interval, credential):
-        log.info("Running job for account [{account_id}], IP [{ipv4}], OIDS: {oids}".format(
-            account_id=account_id,
-            ipv4=entity["ipv4"],
-            oids=["SNMP{} {}".format(o["fetch_method"].upper(), o["oid"]) for o in sensor["oids"]],
+    def do_snmp(*args, **entity_info):
+        """
+            {
+                "entity_id": 1348300224,
+                "name": "localhost",
+                "entity_type": "device",
+                "details": {
+                    "ipv4": "127.0.0.1"
+                },
+                "credential_details": {
+                    "version": "snmpv1",
+                    "snmpv12_community": "public"
+                },
+                "sensors": [
+                    {
+                        "sensor_details": {
+                            "oids": [
+                                {
+                                    "oid": "1.3.6.1.4.1.2021.13.16.2.1.3",
+                                    "fetch_method": "walk"
+                                }
+                            ],
+                            "expression": "$1",
+                            "output_path": "lm-sensors"
+                        },
+                        "interval": 30
+                    },
+                    {
+                        "sensor_details": {
+                            "oids": [
+                                {
+                                    "oid": "1.3.6.1.4.1.2021.13.16.2.1.3.5",
+                                    "fetch_method": "get"
+                                }
+                            ],
+                            "expression": "$1",
+                            "output_path": "lmsensorscore3"
+                        },
+                        "interval": 20
+                    }
+                ],
+                "account_id": 1
+            }
+        """
+        # filter out only those sensors that are supposed to run at this interval:
+        affecting_intervals, = args
+        sensors = [s for s in entity_info["sensors"] if s["interval"] in affecting_intervals]
+        oids = []
+        for sensor in sensors:
+            oids.extend(sensor["sensor_details"]["oids"])
+        log.info("Running job for account [{account_id}], IP [{ipv4}], nsensors: {n_sensors}, oids: {oids}".format(
+            account_id=entity_info["account_id"],
+            ipv4=entity_info["details"]["ipv4"],
+            n_sensors=len(sensors),
+            oids=["SNMP{} {}".format(o["fetch_method"].upper(), o["oid"]) for o in oids],
         ))
 
-    def execute(self):
-        # initialize a scheduler:
-        job_defaults = {
-            'coalesce': True,  # if multiple jobs "misfire", re-run only one instance of a missed job
-            'max_instances': 1,
-        }
-        self.scheduler = BlockingScheduler(job_defaults=job_defaults, timezone=utc)
 
-        # apply config to scheduler:
-        for job_config in self.jobs_configs:
-            self.scheduler.add_job(SNMPCollector.do_snmp, 'interval', seconds=job_config["interval"], kwargs=job_config)
 
-        try:
-            self.scheduler.start()
-        except KeyboardInterrupt:
-            log.info("Got exit signal, exiting.")
+    def jobs(self):
+        """
+            Each entity (device) is a single job, no matter how many sensors it has. The reason is
+            that when the intervals align, we can then issue a single SNMP Bulk GET/WALK.
+        """
+        for entity_info in self.fetch_job_configs('snmp'):
+            intervals = list(set([sensor_info["interval"] for sensor_info in entity_info["sensors"]]))
+            yield intervals, SNMPCollector.do_snmp, entity_info
+
 
 if __name__ == "__main__":
     dotenv.load_dotenv()
