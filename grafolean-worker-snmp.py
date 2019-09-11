@@ -22,7 +22,7 @@ log = logging.getLogger("{}.{}".format(__name__, "base"))
 class SNMPCollector(Collector):
 
     @staticmethod
-    def do_snmp(*args, **entity_info):
+    def do_snmp(*args, **job_info):
         """
             {
                 "entity_id": 1348300224,
@@ -71,10 +71,10 @@ class SNMPCollector(Collector):
 
         # initialize session:
         session_kwargs = {
-            "hostname": entity_info["details"]["ipv4"],
+            "hostname": job_info["details"]["ipv4"],
             "use_numeric": True,
         }
-        cred = entity_info["credential_details"]
+        cred = job_info["credential_details"]
         snmp_version = int(cred["version"][5:6])
         session_kwargs["version"] = snmp_version
         if snmp_version in [1, 2]:
@@ -95,7 +95,7 @@ class SNMPCollector(Collector):
         session = Session(**session_kwargs)
 
 
-        activated_sensors = [s for s in entity_info["sensors"] if s["interval"] in affecting_intervals]
+        activated_sensors = [s for s in job_info["sensors"] if s["interval"] in affecting_intervals]
         for sensor in activated_sensors:
             results = []
             oids = [o["oid"] for o in sensor["sensor_details"]["oids"]]
@@ -107,16 +107,49 @@ class SNMPCollector(Collector):
                 else:
                     result = session.walk(oid)
                     results.append(result)
-            log.info("Results: {}".format(list(zip(oids, methods, results))))
+            oids_results = list(zip(oids, methods, results))
+            log.info("Results: {}".format(oids_results))
+
+
+
+
+            # SNMPCollector.send_results_to_grafolean(
+            #     job_info["base_url"],
+            #     job_info["bot_token"],
+            #     job_info["account_id"],
+            #     job_info["entity_id"],
+            #     oids_results,
+            #     sensor["sensor_details"]["expression"],
+            #     sensor["sensor_details"]["output_path"],
+            # )
 
 
         # log.info("Running job for account [{account_id}], IP [{ipv4}], nsensors: {n_sensors}, oids: {oids}".format(
-        #     account_id=entity_info["account_id"],
-        #     ipv4=entity_info["details"]["ipv4"],
+        #     account_id=job_info["account_id"],
+        #     ipv4=job_info["details"]["ipv4"],
         #     n_sensors=len(sensors),
         #     oids=["SNMP{} {}".format(o["fetch_method"].upper(), o["oid"]) for o in oids],
         # ))
 
+    # @staticmethod
+    # def send_results_to_grafolean(base_url, bot_token, account_id, entity_id, results, expression, output_path):
+    #     url = '{}/api/accounts/{}/values/?b={}'.format(base_url, account_id, bot_token)
+    #     values = []
+    #     for ip in results:
+    #         for ping_index, ping_time in enumerate(results[ip]):
+    #             values.append({
+    #                 'p': 'ping.{}.{}.success'.format(ip.replace('.', '_'), ping_index),
+    #                 'v': 0 if ping_time is None else 1,
+    #             })
+    #             if ping_time is not None:
+    #                 values.append({
+    #                     'p': 'ping.{}.{}.rtt'.format(ip.replace('.', '_'), ping_index),
+    #                     'v': ping_time,
+    #                 })
+    #     print("Sending results to Grafolean")
+    #     r = requests.post(url, json=values)
+    #     print(r.text)
+    #     r.raise_for_status()
 
 
 
@@ -127,7 +160,8 @@ class SNMPCollector(Collector):
         """
         for entity_info in self.fetch_job_configs('snmp'):
             intervals = list(set([sensor_info["interval"] for sensor_info in entity_info["sensors"]]))
-            yield intervals, SNMPCollector.do_snmp, entity_info
+            job_info = { **entity_info, "backend_url": self.backend_url, "bot_token": self.bot_token }
+            yield intervals, SNMPCollector.do_snmp, job_info
 
 
 if __name__ == "__main__":
