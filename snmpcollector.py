@@ -6,6 +6,7 @@ from pytz import utc
 from colors import color
 
 from easysnmp import Session
+from mathjspy import MathJS
 
 from collector import Collector
 
@@ -17,6 +18,57 @@ logging.addLevelName(logging.INFO, "INF")
 logging.addLevelName(logging.WARNING, color('WRN', fg='red'))
 logging.addLevelName(logging.ERROR, color('ERR', bg='red'))
 log = logging.getLogger("{}.{}".format(__name__, "base"))
+
+
+class NoValueForOid(Exception):
+    pass
+
+
+def _apply_expression_to_results(snmp_results, methods, expression, output_path):
+    if 'walk' in methods:
+        """
+            - determine which oid indexes are used
+            - rearrange SNMP results so that they are in dicts, addressable by oid_indexes
+            - for each oid_index, calculate expression value
+        """
+        walk_indexes = [v.oid_index for v in snmp_results[methods.index('walk')]]
+
+        addressable_results = []
+        for i, snmp_result in enumerate(snmp_results):
+            if methods[i] == 'get':
+                # GET value is used n-times, to simulate walk
+                addressable_results.append({oid_index: snmp_result for oid_index in walk_indexes})
+            elif methods[i] == 'walk':
+                addressable_results.append({o.oid_index: o for o in snmp_result})
+
+        result = []
+        for oid_index in walk_indexes:
+            try:
+                mjs = MathJS()
+                for i, r in enumerate(addressable_results):
+                    v = r.get(oid_index)
+                    if v is None:
+                        raise NoValueForOid()
+                    mjs.set('${}'.format(i + 1), float(v.value))
+                value = mjs.eval(expression)
+                result.append({
+                    'path': f'{output_path}.{oid_index}',
+                    'value': value,
+                })
+            except NoValueForOid:
+                log.warn(f'Missing value for oid index: {oid_index}')
+        return result
+
+    else:
+        mjs = MathJS()
+        for i, r in enumerate(snmp_results):
+            mjs.set('${}'.format(i + 1), float(r.value))
+        value = mjs.eval(expression)
+        return [
+            {'path': output_path, 'value': value},
+        ]
+
+
 
 
 class SNMPCollector(Collector):
@@ -100,6 +152,7 @@ class SNMPCollector(Collector):
             results = []
             oids = [o["oid"] for o in sensor["sensor_details"]["oids"]]
             methods = [o["fetch_method"] for o in sensor["sensor_details"]["oids"]]
+            walk_indexes = None
             for oid, fetch_method in zip(oids, methods):
                 if fetch_method == 'get':
                     result = session.get(oid)
@@ -107,9 +160,22 @@ class SNMPCollector(Collector):
                 else:
                     result = session.walk(oid)
                     results.append(result)
+                    # while we are at it, save the indexes of the results:
+                    if not walk_indexes:
+                        walk_indexes = [r.oid_index for r in result]
             oids_results = list(zip(oids, methods, results))
             log.info("Results: {}".format(oids_results))
 
+            expression = sensor["sensor_details"]["expression"]
+            output_path = sensor["sensor_details"]["output_path"]
+            # values = _apply_expression_to_results(results, walk_indexes, methods, oids, expression, output_path)
+            # We have SNMP results and expression - let's calculate value(s). The trick here is that
+            # if some of the data is fetched via SNMP WALK, we will have many results; if only SNMP
+            # GET was used, we get only one.
+            values = []
+            if 'walk' in methods:
+                for oid_index in walk_indexes:
+                    pass
 
 
 
