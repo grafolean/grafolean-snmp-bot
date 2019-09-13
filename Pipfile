@@ -5,12 +5,16 @@ verify_ssl = true
 
 [dev-packages]
 pylint = "*"
+pytest = "*"
 
 [packages]
 requests = "*"
 python-dotenv = "*"
 apscheduler = "*"
 ansicolors = "*"
+easysnmp = "*"
+mathjspy = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.6"
