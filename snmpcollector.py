@@ -4,6 +4,7 @@ import logging
 import json
 from pytz import utc
 from colors import color
+import requests
 
 from easysnmp import Session
 from mathjspy import MathJS
@@ -52,8 +53,8 @@ def _apply_expression_to_results(snmp_results, methods, expression, output_path)
                     mjs.set('${}'.format(i + 1), float(v.value))
                 value = mjs.eval(expression)
                 result.append({
-                    'path': f'{output_path}.{oid_index}',
-                    'value': value,
+                    'p': f'{output_path}.{oid_index}',
+                    'v': value,
                 })
             except NoValueForOid:
                 log.warn(f'Missing value for oid index: {oid_index}')
@@ -65,10 +66,20 @@ def _apply_expression_to_results(snmp_results, methods, expression, output_path)
             mjs.set('${}'.format(i + 1), float(r.value))
         value = mjs.eval(expression)
         return [
-            {'path': output_path, 'value': value},
+            {'p': output_path, 'v': value},
         ]
 
 
+def send_results_to_grafolean(backend_url, bot_token, account_id, values):
+    url = '{}/accounts/{}/values/?b={}'.format(backend_url, account_id, bot_token)
+
+    log.info("Sending results to Grafolean")
+    try:
+        r = requests.post(url, json=values)
+        r.raise_for_status()
+        log.info("Results sent.")
+    except:
+        log.exception("Error sending data to Grafolean")
 
 
 class SNMPCollector(Collector):
@@ -118,6 +129,11 @@ class SNMPCollector(Collector):
                 "account_id": 1
             }
         """
+        log.info("Running job for account [{account_id}], IP [{ipv4}]".format(
+            account_id=job_info["account_id"],
+            ipv4=job_info["details"]["ipv4"],
+        ))
+
         # filter out only those sensors that are supposed to run at this interval:
         affecting_intervals, = args
 
@@ -146,7 +162,6 @@ class SNMPCollector(Collector):
 
         session = Session(**session_kwargs)
 
-
         activated_sensors = [s for s in job_info["sensors"] if s["interval"] in affecting_intervals]
         for sensor in activated_sensors:
             results = []
@@ -166,57 +181,13 @@ class SNMPCollector(Collector):
             oids_results = list(zip(oids, methods, results))
             log.info("Results: {}".format(oids_results))
 
-            expression = sensor["sensor_details"]["expression"]
-            output_path = sensor["sensor_details"]["output_path"]
-            # values = _apply_expression_to_results(results, walk_indexes, methods, oids, expression, output_path)
             # We have SNMP results and expression - let's calculate value(s). The trick here is that
             # if some of the data is fetched via SNMP WALK, we will have many results; if only SNMP
-            # GET was used, we get only one.
-            values = []
-            if 'walk' in methods:
-                for oid_index in walk_indexes:
-                    pass
-
-
-
-            # SNMPCollector.send_results_to_grafolean(
-            #     job_info["base_url"],
-            #     job_info["bot_token"],
-            #     job_info["account_id"],
-            #     job_info["entity_id"],
-            #     oids_results,
-            #     sensor["sensor_details"]["expression"],
-            #     sensor["sensor_details"]["output_path"],
-            # )
-
-
-        # log.info("Running job for account [{account_id}], IP [{ipv4}], nsensors: {n_sensors}, oids: {oids}".format(
-        #     account_id=job_info["account_id"],
-        #     ipv4=job_info["details"]["ipv4"],
-        #     n_sensors=len(sensors),
-        #     oids=["SNMP{} {}".format(o["fetch_method"].upper(), o["oid"]) for o in oids],
-        # ))
-
-    # @staticmethod
-    # def send_results_to_grafolean(base_url, bot_token, account_id, entity_id, results, expression, output_path):
-    #     url = '{}/api/accounts/{}/values/?b={}'.format(base_url, account_id, bot_token)
-    #     values = []
-    #     for ip in results:
-    #         for ping_index, ping_time in enumerate(results[ip]):
-    #             values.append({
-    #                 'p': 'ping.{}.{}.success'.format(ip.replace('.', '_'), ping_index),
-    #                 'v': 0 if ping_time is None else 1,
-    #             })
-    #             if ping_time is not None:
-    #                 values.append({
-    #                     'p': 'ping.{}.{}.rtt'.format(ip.replace('.', '_'), ping_index),
-    #                     'v': ping_time,
-    #                 })
-    #     print("Sending results to Grafolean")
-    #     r = requests.post(url, json=values)
-    #     print(r.text)
-    #     r.raise_for_status()
-
+            # GET was used, we get one.
+            expression = sensor["sensor_details"]["expression"]
+            output_path = sensor["sensor_details"]["output_path"]
+            values = _apply_expression_to_results(results, methods, expression, f'snmp.{output_path}')
+            send_results_to_grafolean(job_info['backend_url'], job_info['bot_token'], job_info['account_id'], values)
 
 
     def jobs(self):

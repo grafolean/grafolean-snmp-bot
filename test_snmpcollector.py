@@ -11,7 +11,7 @@ def test_snmpget():
     expression = '$1'
     output_path = 'snmp.test123.asdf'
     expected_result = [
-        { 'path': 'snmp.test123.asdf', 'value': 68000.0 },
+        { 'p': 'snmp.test123.asdf', 'v': 68000.0 },
     ]
     assert _apply_expression_to_results(results, methods, expression, output_path) == expected_result
 
@@ -24,7 +24,7 @@ def test_snmpget_add():
     expression = '$1 + $2'
     output_path = 'snmp.test123.asdf'
     expected_result = [
-        { 'path': 'snmp.test123.asdf', 'value': 68200.0 },
+        { 'p': 'snmp.test123.asdf', 'v': 68200.0 },
     ]
     assert _apply_expression_to_results(results, methods, expression, output_path) == expected_result
 
@@ -40,9 +40,9 @@ def test_snmpwalk():
     expression = '$1'
     output_path = 'snmp.test123.asdf'
     expected_result = [
-        { 'path': 'snmp.test123.asdf.1', 'value': 60000.0 },
-        { 'path': 'snmp.test123.asdf.2', 'value': 61000.0 },
-        { 'path': 'snmp.test123.asdf.3', 'value': 62000.0 },
+        { 'p': 'snmp.test123.asdf.1', 'v': 60000.0 },
+        { 'p': 'snmp.test123.asdf.2', 'v': 61000.0 },
+        { 'p': 'snmp.test123.asdf.3', 'v': 62000.0 },
     ]
     assert _apply_expression_to_results(results, methods, expression, output_path) == expected_result
 
@@ -59,8 +59,8 @@ def test_expression_add():
     expression = '$1 + $2'
     output_path = 'snmp.test123.asdf'
     expected_result = [
-        { 'path': 'snmp.test123.asdf.1', 'value': 60500.0 },
-        { 'path': 'snmp.test123.asdf.2', 'value': 61500.0 },
-        { 'path': 'snmp.test123.asdf.3', 'value': 62500.0 },
+        { 'p': 'snmp.test123.asdf.1', 'v': 60500.0 },
+        { 'p': 'snmp.test123.asdf.2', 'v': 61500.0 },
+        { 'p': 'snmp.test123.asdf.3', 'v': 62500.0 },
     ]
     assert _apply_expression_to_results(results, methods, expression, output_path) == expected_result
