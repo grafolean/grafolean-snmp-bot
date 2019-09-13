@@ -156,11 +156,12 @@ class IntervalsAwareProcessPoolExecutor(BaseExecutor):
 
 
 class Collector(object):
-    __slots__ = 'backend_url', 'bot_token', 'scheduler', 'known_jobs'
+    __slots__ = 'backend_url', 'bot_token', 'scheduler', 'known_jobs', 'jobs_refresh_interval'
 
-    def __init__(self, backend_url, bot_token):
+    def __init__(self, backend_url, bot_token, jobs_refresh_interval):
         self.backend_url = backend_url
         self.bot_token = bot_token
+        self.jobs_refresh_interval = jobs_refresh_interval
         self.known_jobs = {}
 
     @abstractmethod
@@ -278,7 +279,7 @@ class Collector(object):
                     self.refresh_jobs()
                 except:
                     logging.exception("Error refreshing jobs.")
-                time.sleep(120)
+                time.sleep(self.jobs_refresh_interval)
 
         except KeyboardInterrupt:
             logging.info("Got exit signal, exiting.")

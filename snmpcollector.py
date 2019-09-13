@@ -209,6 +209,7 @@ if __name__ == "__main__":
     bot_token = os.environ.get('BOT_TOKEN')
     if not backend_url or not bot_token:
         raise Exception("Please specify BACKEND_URL and BOT_TOKEN env vars.")
+    jobs_refresh_interval = int(os.environ.get('JOBS_REFRESH_INTERVAL', 120))
 
-    c = SNMPCollector(backend_url, bot_token)
+    c = SNMPCollector(backend_url, bot_token, jobs_refresh_interval)
     c.execute()
