@@ -10,7 +10,7 @@ from abc import abstractmethod
 import concurrent.futures
 import traceback
 
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.base import BaseTrigger
 from apscheduler.executors.base import BaseExecutor
 from apscheduler.events import (
@@ -156,16 +156,18 @@ class IntervalsAwareProcessPoolExecutor(BaseExecutor):
 
 
 class Collector(object):
-    __slots__ = 'backend_url', 'bot_token'
+    __slots__ = 'backend_url', 'bot_token', 'scheduler', 'known_jobs', 'jobs_refresh_interval'
 
-    def __init__(self, backend_url, bot_token):
+    def __init__(self, backend_url, bot_token, jobs_refresh_interval):
         self.backend_url = backend_url
         self.bot_token = bot_token
+        self.jobs_refresh_interval = jobs_refresh_interval
+        self.known_jobs = {}
 
     @abstractmethod
     def jobs(self):
         """
-            Returns a list of (intervals, job_func, job_data) tuples. Usually calls
+            Returns a list of (job_id, intervals, job_func, job_data) tuples. Usually calls
             `fetch_job_configs` to get input data.
         """
 
@@ -246,6 +248,17 @@ class Collector(object):
 
                 yield entity_info
 
+    def refresh_jobs(self):
+        for job_id, intervals, job_func, job_data in self.jobs():
+            # if the existing job's configuration is the same, leave it alone, otherwise the trigger will be reset:
+            if self.known_jobs.get(job_id) == job_data:
+                continue
+            self.known_jobs[job_id] = job_data
+
+            trigger = MultipleIntervalsTrigger(intervals)
+            logging.info(f"Adding job: {job_id}")
+            self.scheduler.add_job(job_func, id=job_id, trigger=trigger, executor='iaexecutor', kwargs=job_data, replace_existing=True)
+
     def execute(self):
         """
             Calls self.jobs() to get the list of the jobs, and executes them by using
@@ -256,15 +269,19 @@ class Collector(object):
             'coalesce': True,  # if multiple jobs "misfire", re-run only one instance of a missed job
             'max_instances': 1,
         }
-        scheduler = BlockingScheduler(job_defaults=job_defaults, timezone=utc)
-        executor = IntervalsAwareProcessPoolExecutor(10)
-        scheduler.add_executor(executor, 'iaexecutor')
-
-        for intervals, job_func, job_data in self.jobs():
-            trigger = MultipleIntervalsTrigger(intervals)
-            scheduler.add_job(job_func, trigger=trigger, executor='iaexecutor', kwargs=job_data)
+        self.scheduler = BackgroundScheduler(job_defaults=job_defaults, timezone=utc)
+        self.scheduler.add_executor(IntervalsAwareProcessPoolExecutor(10), 'iaexecutor')
 
         try:
-            scheduler.start()
+            self.scheduler.start()
+            while True:
+                try:
+                    self.refresh_jobs()
+                except:
+                    logging.exception("Error refreshing jobs.")
+                time.sleep(self.jobs_refresh_interval)
+
         except KeyboardInterrupt:
             logging.info("Got exit signal, exiting.")
+        finally:
+            self.scheduler.shutdown()

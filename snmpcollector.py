@@ -77,7 +77,7 @@ def send_results_to_grafolean(backend_url, bot_token, account_id, values):
     try:
         r = requests.post(url, json=values)
         r.raise_for_status()
-        log.info("Results sent.")
+        log.info("Results sent: {}".format(values))
     except:
         log.exception("Error sending data to Grafolean")
 
@@ -198,7 +198,8 @@ class SNMPCollector(Collector):
         for entity_info in self.fetch_job_configs('snmp'):
             intervals = list(set([sensor_info["interval"] for sensor_info in entity_info["sensors"]]))
             job_info = { **entity_info, "backend_url": self.backend_url, "bot_token": self.bot_token }
-            yield intervals, SNMPCollector.do_snmp, job_info
+            job_id = str(entity_info["entity_id"])
+            yield job_id, intervals, SNMPCollector.do_snmp, job_info
 
 
 if __name__ == "__main__":
@@ -208,6 +209,7 @@ if __name__ == "__main__":
     bot_token = os.environ.get('BOT_TOKEN')
     if not backend_url or not bot_token:
         raise Exception("Please specify BACKEND_URL and BOT_TOKEN env vars.")
+    jobs_refresh_interval = int(os.environ.get('JOBS_REFRESH_INTERVAL', 120))
 
-    c = SNMPCollector(backend_url, bot_token)
+    c = SNMPCollector(backend_url, bot_token, jobs_refresh_interval)
     c.execute()
