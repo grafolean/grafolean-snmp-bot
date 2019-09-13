@@ -57,7 +57,7 @@ def _apply_expression_to_results(snmp_results, methods, expression, output_path)
                     'v': value,
                 })
             except NoValueForOid:
-                log.warn(f'Missing value for oid index: {oid_index}')
+                log.warning(f'Missing value for oid index: {oid_index}')
         return result
 
     else:

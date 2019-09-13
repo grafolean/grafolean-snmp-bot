@@ -64,3 +64,24 @@ def test_expression_add():
         { 'p': 'snmp.test123.asdf.3', 'v': 62500.0 },
     ]
     assert _apply_expression_to_results(results, methods, expression, output_path) == expected_result
+
+def test_snmpwalk_missing_value():
+    results = [
+        [
+            SNMPVariable(oid='1.3.6.1.4.1.2021.13.16.2.1.3', oid_index='1', value=60000, snmp_type='GAUGE'),
+            SNMPVariable(oid='1.3.6.1.4.1.2021.13.16.2.1.3', oid_index='2', value=61000, snmp_type='GAUGE'),
+            SNMPVariable(oid='1.3.6.1.4.1.2021.13.16.2.1.3', oid_index='3', value=62000, snmp_type='GAUGE'),
+        ],
+        [
+            SNMPVariable(oid='1.3.6.1.4.1.2021.13.16.2.2.2', oid_index='1', value=10, snmp_type='GAUGE'),
+            SNMPVariable(oid='1.3.6.1.4.1.2021.13.16.2.2.2', oid_index='2', value=10, snmp_type='GAUGE'),
+        ],
+    ]
+    methods = ['walk' if isinstance(x, list) else 'get' for x in results]
+    expression = '$1 / $2'
+    output_path = 'snmp.test123.asdf'
+    expected_result = [
+        { 'p': 'snmp.test123.asdf.1', 'v': 6000.0 },
+        { 'p': 'snmp.test123.asdf.2', 'v': 6100.0 },
+    ]
+    assert _apply_expression_to_results(results, methods, expression, output_path) == expected_result
