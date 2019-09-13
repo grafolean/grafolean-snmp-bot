@@ -77,7 +77,7 @@ def send_results_to_grafolean(backend_url, bot_token, account_id, values):
     try:
         r = requests.post(url, json=values)
         r.raise_for_status()
-        log.info("Results sent.")
+        log.info("Results sent: {}".format(values))
     except:
         log.exception("Error sending data to Grafolean")
 
