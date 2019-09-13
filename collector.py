@@ -165,7 +165,7 @@ class Collector(object):
     @abstractmethod
     def jobs(self):
         """
-            Returns a list of (intervals, job_func, job_data) tuples. Usually calls
+            Returns a list of (job_id, intervals, job_func, job_data) tuples. Usually calls
             `fetch_job_configs` to get input data.
         """
 
@@ -260,9 +260,9 @@ class Collector(object):
         executor = IntervalsAwareProcessPoolExecutor(10)
         scheduler.add_executor(executor, 'iaexecutor')
 
-        for intervals, job_func, job_data in self.jobs():
+        for job_id, intervals, job_func, job_data in self.jobs():
             trigger = MultipleIntervalsTrigger(intervals)
-            scheduler.add_job(job_func, trigger=trigger, executor='iaexecutor', kwargs=job_data)
+            scheduler.add_job(job_func, id=job_id, trigger=trigger, executor='iaexecutor', kwargs=job_data)
 
         try:
             scheduler.start()

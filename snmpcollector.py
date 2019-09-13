@@ -198,7 +198,8 @@ class SNMPCollector(Collector):
         for entity_info in self.fetch_job_configs('snmp'):
             intervals = list(set([sensor_info["interval"] for sensor_info in entity_info["sensors"]]))
             job_info = { **entity_info, "backend_url": self.backend_url, "bot_token": self.bot_token }
-            yield intervals, SNMPCollector.do_snmp, job_info
+            job_id = str(entity_info["entity_id"])
+            yield job_id, intervals, SNMPCollector.do_snmp, job_info
 
 
 if __name__ == "__main__":
