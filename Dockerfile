@@ -40,4 +40,4 @@ RUN \
     echo "alias l='ls -altr'" >> /root/.bashrc
 COPY --from=build-backend /snmpcollector/ /snmpcollector/
 WORKDIR /snmpcollector
-CMD ["/usr/bin/python", "-m", "snmpcollector"]
+CMD ["python", "-m", "snmpcollector"]
