@@ -1,0 +1,21 @@
+image: docker:stable
+
+services:
+  - docker:dind
+
+variables:
+  DOCKER_DRIVER: overlay2
+
+stages:
+  - test
+
+pytest:
+  stage: test
+  image: python:3.6-slim-stretch
+  before_script:
+    - apt-get update
+    - apt-get install --no-install-recommends -q -y libsnmp-dev build-essential
+    - pip install pipenv
+    - pipenv install --dev
+  script:
+    - pipenv run pytest -x test_snmpcollector.py
