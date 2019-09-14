@@ -8,6 +8,7 @@ variables:
 
 stages:
   - test
+  - deploy
 
 pytest:
   stage: test
@@ -19,3 +20,25 @@ pytest:
     - pipenv install --dev
   script:
     - pipenv run pytest -x test_snmpcollector.py
+
+deploy to docker hub:
+  stage: deploy
+  when: manual
+  only:
+    variables:
+      - $CI_COMMIT_TAG =~ /^v[0-9]+[.][0-9]+[.][0-9]+([.][^.]+)?$/
+  variables:
+    CI_REGISTRY_IMAGE: grafolean/grafolean-collector-snmp
+  script:
+    - apk add --no-cache git
+    # check that we are deploying the latest version:
+    - export LAST_KNOWN_VERSION=`git tag -l --sort=-version:refname "v*.*.*" | head -n 1 | tr -d '[:space:]'`
+    - '[ "$LAST_KNOWN_VERSION" == "$CI_COMMIT_TAG" ] || (echo "Tag does not denote latest known version (which is $LAST_KNOWN_VERSION), aborting!" && exit 1)'
+    - echo "Deploying..."
+    - cp ./install/docker-compose/Dockerfile .
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t "docker.io/$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" -t "docker.io/$CI_REGISTRY_IMAGE:latest" --build-arg VERSION=$CI_COMMIT_TAG --build-arg VCS_REF=$CI_COMMIT_SHA --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') .
+    - docker push "docker.io/$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+    - docker push "docker.io/$CI_REGISTRY_IMAGE:latest"
+    - docker rmi $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
+    - docker rmi $CI_REGISTRY_IMAGE:latest
