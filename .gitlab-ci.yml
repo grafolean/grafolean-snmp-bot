@@ -16,7 +16,7 @@ pytest:
   before_script:
     - apt-get update
     - apt-get install --no-install-recommends -q -y libsnmp-dev build-essential
-    - pip install pipenv
+    - pip install --no-cache-dir pipenv
     - pipenv install --dev
   script:
     - pipenv run pytest -x test_snmpcollector.py

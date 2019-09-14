@@ -32,7 +32,7 @@ COPY --from=python-requirements /requirements.txt /requirements.txt
 RUN \
     apt-get update && \
     apt-get install --no-install-recommends -q -y libsnmp-dev build-essential&& \
-    pip install -r /requirements.txt && \
+    pip install --no-cache-dir -r /requirements.txt && \
     apt-get purge -y build-essential && \
     apt-get clean autoclean && \
     apt-get autoremove --yes && \
