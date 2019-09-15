@@ -249,7 +249,9 @@ class Collector(object):
                 yield entity_info
 
     def refresh_jobs(self):
+        wanted_jobs = set()
         for job_id, intervals, job_func, job_data in self.jobs():
+            wanted_jobs.add(job_id)
             # if the existing job's configuration is the same, leave it alone, otherwise the trigger will be reset:
             if self.known_jobs.get(job_id) == job_data:
                 continue
@@ -258,6 +260,13 @@ class Collector(object):
             trigger = MultipleIntervalsTrigger(intervals)
             logging.info(f"Adding job: {job_id}")
             self.scheduler.add_job(job_func, id=job_id, trigger=trigger, executor='iaexecutor', kwargs=job_data, replace_existing=True)
+
+        # remove any jobs that are currently running but are no longer wanted:
+        existing_jobs = set(self.known_jobs.keys())
+        to_be_removed = existing_jobs - wanted_jobs
+        for job_id in to_be_removed:
+            del self.known_jobs[job_id]
+            self.scheduler.remove_job(job_id)
 
     def execute(self):
         """
