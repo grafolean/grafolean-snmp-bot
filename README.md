@@ -35,7 +35,8 @@ This is the easiest and currently the only officially supported way. However oth
     - mandatory: `BACKEND_URL` (set to the URL of Grafolean backend, for example `https://grafolean.com/api`),
     - mandatory: `BOT_TOKEN` (set to the bot token from step 1),
     - optional: `JOBS_REFRESH_INTERVAL` (interval in seconds at which the jobs definitions will be updated)
-3) run: `docker-compose up -d`
+   Alternatively, you can also copy `.env.example` to `.env` and change settings there (leaving `docker-compose.yml` in original state).
+4) run: `docker-compose up -d`
 
 ## Upgrade
 
