@@ -185,8 +185,8 @@ class SNMPCollector(Collector):
             # if some of the data is fetched via SNMP WALK, we will have many results; if only SNMP
             # GET was used, we get one.
             expression = sensor["sensor_details"]["expression"]
-            output_path = sensor["sensor_details"]["output_path"]
-            values = _apply_expression_to_results(results, methods, expression, f'snmp.{output_path}')
+            output_path = f'entity.{job_info["entity_id"]}.snmp.{sensor["sensor_details"]["output_path"]}'
+            values = _apply_expression_to_results(results, methods, expression, output_path)
             send_results_to_grafolean(job_info['backend_url'], job_info['bot_token'], job_info['account_id'], values)
 
 
