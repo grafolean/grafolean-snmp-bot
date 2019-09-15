@@ -28,4 +28,4 @@ services:
     # Grafolean backend must be accessible on BACKEND_URL *from the point of view of container*. If running
     # on the same host, '127.0.0.1' translates to container, not host - this directive changes network mode
     # so that Docker networking is bypassed.
-    #network_mode: "host"
+    network_mode: "host"
