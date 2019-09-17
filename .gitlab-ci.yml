@@ -15,7 +15,7 @@ pytest:
   image: python:3.6-slim-stretch
   before_script:
     - apt-get update
-    - apt-get install --no-install-recommends -q -y libsnmp-dev build-essential
+    - apt-get install --no-install-recommends -q -y libsnmp-dev build-essential git
     - pip install --no-cache-dir pipenv
     - pipenv install --dev
   script:
