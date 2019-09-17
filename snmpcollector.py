@@ -56,10 +56,17 @@ def _convert_counters_to_values(results, now, counter_ident_prefix):
         _save_current_counter_value(new_value, now, counter_ident)
         if old_value is None:
             new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
-        else:
-            dt = now - t
-            dv = (new_value - old_value) / dt
-            new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=dv, snmp_type='COUNTER_PER_S'))
+            continue
+
+        # it seems like the counter overflow happened, discard result:
+        if new_value < old_value:
+            new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
+            log.warning(f"Counter overflow detected for oid {v.oid}, oid index {v.oid_index}, discarding value - if this happens often, consider using OIDS with 64bit counters (if available) or decreasing polling interval.")
+            continue
+
+        dt = now - t
+        dv = (new_value - old_value) / dt
+        new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=dv, snmp_type='COUNTER_PER_S'))
     return new_results
 
 

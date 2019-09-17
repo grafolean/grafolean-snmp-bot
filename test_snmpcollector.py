@@ -119,8 +119,7 @@ def test_convert_counters_counter():
 
     results_0 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.16', oid_index='1', value='1000', snmp_type='COUNTER')]
     expected_0 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.16', oid_index='1', value=None, snmp_type='COUNTER_PER_S')]
-    actual = _convert_counters_to_values(results_0, now, "ASDF/1234")
-    assert actual == expected_0
+    assert _convert_counters_to_values(results_0, now, "ASDF/1234") == expected_0
 
     results_1 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.16', oid_index='1', value='2000.0', snmp_type='COUNTER')]
     expected_1 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.16', oid_index='1', value='1000.0', snmp_type='COUNTER_PER_S')]
@@ -129,3 +128,23 @@ def test_convert_counters_counter():
     results_2 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.16', oid_index='1', value='2300.0', snmp_type='COUNTER')]
     expected_2 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.16', oid_index='1', value='100.0', snmp_type='COUNTER_PER_S')]
     assert _convert_counters_to_values(results_2, now + 1.0 + 3.0, "ASDF/1234") == expected_2
+
+def test_convert_counters_overflow():
+    """ First expression should be empty, next ones should work """
+    now = 1234567890.123456
+
+    results_0 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.17', oid_index='1', value='123000.0', snmp_type='COUNTER')]
+    expected_0 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.17', oid_index='1', value=None, snmp_type='COUNTER_PER_S')]
+    assert _convert_counters_to_values(results_0, now, "ASDF/1234") == expected_0
+
+    results_1 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.17', oid_index='1', value='234000.0', snmp_type='COUNTER')]
+    expected_1 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.17', oid_index='1', value='111000.0', snmp_type='COUNTER_PER_S')]
+    assert _convert_counters_to_values(results_1, now + 1.0, "ASDF/1234") == expected_1
+
+    results_2 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.17', oid_index='1', value='1000.0', snmp_type='COUNTER')]
+    expected_2 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.17', oid_index='1', value=None, snmp_type='COUNTER_PER_S')]
+    assert _convert_counters_to_values(results_2, now + 1.0 + 3.0, "ASDF/1234") == expected_2
+
+    results_3 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.17', oid_index='1', value='2000.0', snmp_type='COUNTER')]
+    expected_3 = [SNMPVariable(oid='.1.3.6.1.2.1.2.2.1.17', oid_index='1', value='500.0', snmp_type='COUNTER_PER_S')]
+    assert _convert_counters_to_values(results_3, now + 1.0 + 3.0 + 2.0, "ASDF/1234") == expected_3
