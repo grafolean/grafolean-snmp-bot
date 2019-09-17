@@ -2,11 +2,12 @@ import os
 import dotenv
 import logging
 import json
+import time
 from pytz import utc
 from colors import color
 import requests
 
-from easysnmp import Session
+from easysnmp import Session, SNMPVariable
 from mathjspy import MathJS
 
 from collector import Collector
@@ -23,6 +24,50 @@ log = logging.getLogger("{}.{}".format(__name__, "base"))
 
 class NoValueForOid(Exception):
     pass
+
+
+previous_counter_values = {}
+
+
+def _get_previous_counter_value(counter_ident):
+    prev_value = previous_counter_values.get(counter_ident)
+    if prev_value is None:
+        return None, None
+    return prev_value
+
+
+def _save_current_counter_value(new_value, now, counter_ident):
+    previous_counter_values[counter_ident] = (new_value, now)
+
+
+def _convert_counters_to_values(results, now, counter_ident_prefix):
+    new_results = []
+    for i, v in enumerate(results):
+        if isinstance(v, list):
+            new_results.append(_convert_counters_to_values(v, now, counter_ident_prefix + f'/{i}'))
+            continue
+        if v.snmp_type not in ['COUNTER', 'COUNTER64']:
+            new_results.append(v)
+            continue
+        # counter - deal with it:
+        counter_ident = counter_ident_prefix + f'/{i}/{v.oid}/{v.oid_index}'
+        old_value, t = _get_previous_counter_value(counter_ident)
+        new_value = float(v.value)
+        _save_current_counter_value(new_value, now, counter_ident)
+        if old_value is None:
+            new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
+            continue
+
+        # it seems like the counter overflow happened, discard result:
+        if new_value < old_value:
+            new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
+            log.warning(f"Counter overflow detected for oid {v.oid}, oid index {v.oid_index}, discarding value - if this happens often, consider using OIDS with 64bit counters (if available) or decreasing polling interval.")
+            continue
+
+        dt = now - t
+        dv = (new_value - old_value) / dt
+        new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=dv, snmp_type='COUNTER_PER_S'))
+    return new_results
 
 
 def _apply_expression_to_results(snmp_results, methods, expression, output_path):
@@ -48,7 +93,9 @@ def _apply_expression_to_results(snmp_results, methods, expression, output_path)
                 mjs = MathJS()
                 for i, r in enumerate(addressable_results):
                     v = r.get(oid_index)
-                    if v is None:
+                    if v is None:  # oid index wasn't present
+                        raise NoValueForOid()
+                    if v.value is None:  # no value (probably the first time we're asking for a counter)
                         raise NoValueForOid()
                     mjs.set('${}'.format(i + 1), float(v.value))
                 value = mjs.eval(expression)
@@ -61,13 +108,19 @@ def _apply_expression_to_results(snmp_results, methods, expression, output_path)
         return result
 
     else:
-        mjs = MathJS()
-        for i, r in enumerate(snmp_results):
-            mjs.set('${}'.format(i + 1), float(r.value))
-        value = mjs.eval(expression)
-        return [
-            {'p': output_path, 'v': value},
-        ]
+        try:
+            mjs = MathJS()
+            for i, v in enumerate(snmp_results):
+                if v.value is None:  # no value (probably the first time we're asking for a counter)
+                    raise NoValueForOid()
+                mjs.set('${}'.format(i + 1), float(v.value))
+            value = mjs.eval(expression)
+            return [
+                {'p': output_path, 'v': value},
+            ]
+        except NoValueForOid:
+            log.warning(f'Missing OID value (counter?)')
+            return []
 
 
 def send_results_to_grafolean(backend_url, bot_token, account_id, values):
@@ -178,15 +231,17 @@ class SNMPCollector(Collector):
                     # while we are at it, save the indexes of the results:
                     if not walk_indexes:
                         walk_indexes = [r.oid_index for r in result]
-            oids_results = list(zip(oids, methods, results))
-            log.info("Results: {}".format(oids_results))
+            log.info("Results: {}".format(list(zip(oids, methods, results))))
+
+            counter_ident_prefix = f'{job_info["entity_id"]}/{sensor["sensor_details"]["id"]}'
+            results_no_counters = _convert_counters_to_values(results, time.time(), counter_ident_prefix)
 
             # We have SNMP results and expression - let's calculate value(s). The trick here is that
             # if some of the data is fetched via SNMP WALK, we will have many results; if only SNMP
             # GET was used, we get one.
             expression = sensor["sensor_details"]["expression"]
             output_path = f'entity.{job_info["entity_id"]}.snmp.{sensor["sensor_details"]["output_path"]}'
-            values = _apply_expression_to_results(results, methods, expression, output_path)
+            values = _apply_expression_to_results(results_no_counters, methods, expression, output_path)
             send_results_to_grafolean(job_info['backend_url'], job_info['bot_token'], job_info['account_id'], values)
 
 
