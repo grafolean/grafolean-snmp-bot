@@ -12,7 +12,7 @@ requests = "*"
 python-dotenv = "*"
 apscheduler = "*"
 ansicolors = "*"
-easysnmp = "*"
+easysnmp = {editable = true,git = "http://github.com/grafolean/easysnmp"}
 mathjspy = "*"
 numpy = "*"
 
