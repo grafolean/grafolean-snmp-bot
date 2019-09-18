@@ -233,7 +233,7 @@ class SNMPCollector(Collector):
                         walk_indexes = [r.oid_index for r in result]
             log.info("Results: {}".format(list(zip(oids, methods, results))))
 
-            counter_ident_prefix = f'{job_info["entity_id"]}/{sensor["sensor_details"]["id"]}'
+            counter_ident_prefix = f'{job_info["entity_id"]}/{sensor["sensor_id"]}'
             results_no_counters = _convert_counters_to_values(results, time.time(), counter_ident_prefix)
 
             # We have SNMP results and expression - let's calculate value(s). The trick here is that
