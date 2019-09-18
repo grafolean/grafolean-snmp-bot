@@ -35,7 +35,7 @@ def _get_previous_counter_value(counter_ident):
     prev_value = r.hgetall(counter_ident)
     if not prev_value:  # empty dict
         return None, None
-    return int(float(prev_value[b'v'])), float(prev_value[b't'])
+    return int(prev_value[b'v']), float(prev_value[b't'])
 
 
 def _save_current_counter_value(new_value, now, counter_ident):
@@ -54,7 +54,7 @@ def _convert_counters_to_values(results, now, counter_ident_prefix):
         # counter - deal with it:
         counter_ident = counter_ident_prefix + f'/{i}/{v.oid}/{v.oid_index}'
         old_value, t = _get_previous_counter_value(counter_ident)
-        new_value = float(v.value)
+        new_value = int(v.value)
         _save_current_counter_value(new_value, now, counter_ident)
         if old_value is None:
             new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
