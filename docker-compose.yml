@@ -16,13 +16,16 @@ services:
     environment:
       # Backend url must be set to the address of the Grafolean backend, for example this uses Grafolean hosted service:
       # - BACKEND_URL=https://grafolean.com/api
+      # IMPORTANT: '127.0.0.1' and 'localhost' are _never_ correct addresses for Grafolean backend, because they translate
+      # to container, not host.
       - BACKEND_URL=
       # To use SNMP Collector, a bot with the protocol "snmp" must be added via user interface, then the token needs to be copied here:
       - BOT_TOKEN=
       # Interval between fetching information about jobs:
       - JOBS_REFRESH_INTERVAL=60
+      - REDIS_HOST=redis
     restart: always
-    # Grafolean backend must be accessible on BACKEND_URL *from the point of view of container*. If running
-    # on the same host, '127.0.0.1' translates to container, not host - this directive changes network mode
-    # so that Docker networking is bypassed.
-    network_mode: "host"
+
+  redis:
+    image: redis:5-alpine
+    container_name: grafolean-collector-snmp-redis
