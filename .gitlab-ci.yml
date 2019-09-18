@@ -13,17 +13,16 @@ stages:
 pytest:
   stage: test
   image: python:3.6-slim-stretch
+  services:
+    - redis:5-alpine
   before_script:
     - apt-get update
     - apt-get install --no-install-recommends -q -y libsnmp-dev build-essential git
     - pip install --no-cache-dir pipenv
     - pipenv install --dev
-    - docker run -d --net=host -p 127.0.0.1:6379:6379 --name redis redis:5-alpine
   script:
-    - export REDIS_HOST="127.0.0.1"
+    - export REDIS_HOST="redis"
     - pipenv run pytest -x test_snmpcollector.py
-  after_script:
-    - docker rm -f redis
 
 deploy to docker hub:
   stage: deploy
