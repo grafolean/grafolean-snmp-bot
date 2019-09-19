@@ -236,6 +236,7 @@ class Collector(object):
 
                     sensors.append({
                         "sensor_details": sensor["details"],
+                        "sensor_id": sensor_id,
                         "interval": interval,
                     })
                 # and hide all other protocols, saving just sensors for selected one: (not strictly necessary, just cleaner)

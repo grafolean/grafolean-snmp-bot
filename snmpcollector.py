@@ -6,6 +6,7 @@ import time
 from pytz import utc
 from colors import color
 import requests
+import redis
 
 from easysnmp import Session, SNMPVariable
 from mathjspy import MathJS
@@ -26,18 +27,19 @@ class NoValueForOid(Exception):
     pass
 
 
-previous_counter_values = {}
+REDIS_HOST = os.environ.get('REDIS_HOST', '127.0.0.1')
+r = redis.Redis(host=REDIS_HOST)
 
 
 def _get_previous_counter_value(counter_ident):
-    prev_value = previous_counter_values.get(counter_ident)
-    if prev_value is None:
+    prev_value = r.hgetall(counter_ident)
+    if not prev_value:  # empty dict
         return None, None
-    return prev_value
+    return int(prev_value[b'v']), float(prev_value[b't'])
 
 
 def _save_current_counter_value(new_value, now, counter_ident):
-    previous_counter_values[counter_ident] = (new_value, now)
+    r.hmset(counter_ident, {b'v': new_value, b't': now})
 
 
 def _convert_counters_to_values(results, now, counter_ident_prefix):
@@ -52,7 +54,7 @@ def _convert_counters_to_values(results, now, counter_ident_prefix):
         # counter - deal with it:
         counter_ident = counter_ident_prefix + f'/{i}/{v.oid}/{v.oid_index}'
         old_value, t = _get_previous_counter_value(counter_ident)
-        new_value = float(v.value)
+        new_value = int(float(v.value))
         _save_current_counter_value(new_value, now, counter_ident)
         if old_value is None:
             new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
@@ -233,7 +235,7 @@ class SNMPCollector(Collector):
                         walk_indexes = [r.oid_index for r in result]
             log.info("Results: {}".format(list(zip(oids, methods, results))))
 
-            counter_ident_prefix = f'{job_info["entity_id"]}/{sensor["sensor_details"]["id"]}'
+            counter_ident_prefix = f'{job_info["entity_id"]}/{sensor["sensor_id"]}'
             results_no_counters = _convert_counters_to_values(results, time.time(), counter_ident_prefix)
 
             # We have SNMP results and expression - let's calculate value(s). The trick here is that
