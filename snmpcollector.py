@@ -128,6 +128,10 @@ def _apply_expression_to_results(snmp_results, methods, expression, output_path)
 def send_results_to_grafolean(backend_url, bot_token, account_id, values):
     url = '{}/accounts/{}/values/?b={}'.format(backend_url, account_id, bot_token)
 
+    if len(values) == 0:
+        log.warning("No results available to be sent to Grafolean, skipping.")
+        return
+
     log.info("Sending results to Grafolean")
     try:
         r = requests.post(url, json=values)
