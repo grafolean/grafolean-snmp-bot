@@ -7,9 +7,11 @@ from pytz import utc
 from colors import color
 import requests
 import redis
+import re
 
 from easysnmp import Session, SNMPVariable
 from mathjspy import MathJS
+from slugify import slugify
 
 from collector import Collector
 
@@ -24,6 +26,10 @@ log = logging.getLogger("{}.{}".format(__name__, "base"))
 
 
 class NoValueForOid(Exception):
+    pass
+
+
+class InvalidOutputPath(Exception):
     pass
 
 
@@ -72,7 +78,38 @@ def _convert_counters_to_values(results, now, counter_ident_prefix):
     return new_results
 
 
-def _apply_expression_to_results(snmp_results, methods, expression, output_path):
+def _construct_output_path(template, addressable_results, oid_index):
+    # make sure that only valid characters are in the template:
+    if not re.match(r'^([.0-9a-zA-Z_-]+|[{][^}]+[}])+$', template):
+        raise InvalidOutputPath("Invalid output path template, could not parse")
+    result_parts = []
+    for between_dots in template.split('.'):
+        OUTPUT_PATH_REGEX = r'([0-9a-zA-Z_-]+|[{][^}]+[}])'  # split parts with curly braces from those without
+        for part in re.findall(OUTPUT_PATH_REGEX, between_dots):
+            if part[0] != '{':
+                result_parts.append(part)
+                continue
+            # expression parsing is currently a bit limited, we only replace {$1} to {$N} and {$index}
+            if part[1] != '$':
+                raise InvalidOutputPath("Only simple substitutions are currently supported (like 'abc.{$2}.{$index}.def') - was expecting '$' after '{'.")
+            expression = part[2:-1]
+            if expression == 'index':
+                result_parts.append(oid_index)
+            else:
+                if not expression.isdigit():
+                    raise InvalidOutputPath("Only simple substitutions are currently supported (like 'abc.{$2}.{$index}.def') - was expecting either 'index' or a number after '$'.")
+                i = int(expression) - 1
+                if not 0 <= i < len(addressable_results):
+                    raise InvalidOutputPath(f"Could not create output path - the number after '$' should be between 1 and {len(addressable_results)} inclusive.")
+                v = addressable_results[i][oid_index]
+                clean_value = slugify(v.value, regex_pattern=r'[^0-9a-zA-Z_-]+', lowercase=False)
+                result_parts.append(clean_value)
+
+        result_parts.append('.')
+    return ''.join(result_parts)[:-1]
+
+
+def _apply_expression_to_results(snmp_results, methods, expression, output_path_template):
     if 'walk' in methods:
         """
             - determine which oid indexes are used
@@ -91,6 +128,7 @@ def _apply_expression_to_results(snmp_results, methods, expression, output_path)
 
         result = []
         for oid_index in walk_indexes:
+            known_output_paths = set()
             try:
                 mjs = MathJS()
                 for i, r in enumerate(addressable_results):
@@ -99,24 +137,38 @@ def _apply_expression_to_results(snmp_results, methods, expression, output_path)
                         raise NoValueForOid()
                     if v.value is None:  # no value (probably the first time we're asking for a counter)
                         raise NoValueForOid()
-                    mjs.set('${}'.format(i + 1), float(v.value))
+                    var_name = f'${i + 1}'
+                    if var_name in expression:  # not all values are used - some might be used by output_path
+                        mjs.set(var_name, float(v.value))
                 value = mjs.eval(expression)
+
+                output_path = _construct_output_path(output_path_template, addressable_results, oid_index)
+                if output_path in known_output_paths:
+                    raise InvalidOutputPath("The same path was already constructed from a previous result, please include {$index} in the output path template, or make sure it is unique!")
+                known_output_paths.add(output_path)
                 result.append({
-                    'p': f'{output_path}.{oid_index}',
+                    'p': output_path,
                     'v': value,
                 })
             except NoValueForOid:
                 log.warning(f'Missing value for oid index: {oid_index}')
+            except InvalidOutputPath as ex:
+                log.warning(f'Invalid output path for oid index [{oid_index}]: {str(ex)}')
         return result
 
     else:
         try:
+            dummy_oid_index = '0'
+            addressable_results = [{dummy_oid_index: v} for v in snmp_results]
             mjs = MathJS()
             for i, v in enumerate(snmp_results):
                 if v.value is None:  # no value (probably the first time we're asking for a counter)
                     raise NoValueForOid()
-                mjs.set('${}'.format(i + 1), float(v.value))
+                var_name = f'${i + 1}'
+                if var_name in expression:  # not all values are used - some might be used by output_path
+                    mjs.set(var_name, float(v.value))
             value = mjs.eval(expression)
+            output_path = _construct_output_path(output_path_template, addressable_results, dummy_oid_index)
             return [
                 {'p': output_path, 'v': value},
             ]

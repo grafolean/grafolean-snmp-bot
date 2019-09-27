@@ -16,6 +16,7 @@ easysnmp = {editable = true,git = "http://github.com/grafolean/easysnmp"}
 mathjspy = "*"
 numpy = "*"
 redis = "*"
+python-slugify = "*"
 
 [requires]
 python_version = "3.6"
