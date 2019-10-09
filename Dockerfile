@@ -40,4 +40,5 @@ RUN \
     echo "alias l='ls -altr'" >> /root/.bashrc
 COPY --from=build-backend /snmpcollector/ /snmpcollector/
 WORKDIR /snmpcollector
+HEALTHCHECK --interval=10s --retries=1 CMD /bin/bash -c "[ ! -f /tmp/fail_health_check ]"
 CMD ["python", "-m", "snmpcollector"]

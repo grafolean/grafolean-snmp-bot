@@ -154,6 +154,32 @@ class IntervalsAwareProcessPoolExecutor(BaseExecutor):
 
         return events
 
+    def _run_job_error(self, job_id, exc, traceback=None):
+        """
+            > Called by the executor with the exception if there is an error  calling `run_job`.
+
+            Sometimes we start getting traceback, after which collector no longer works:
+            -----
+                2019-10-04 19:45:38 | ERR | Error submitting job "SNMPCollector.do_snmp (trigger: <collector.MultipleIntervalsTrigger object at 0x7fd866b9aee8>, next run at: 2019-10-04 19:45:38 UTC)" to executor "iaexecutor"
+                Traceback (most recent call last):
+                File "/usr/local/lib/python3.6/site-packages/apscheduler/schedulers/base.py", line 974, in _process_jobs
+                    executor.submit_job(job, run_times)
+                File "/usr/local/lib/python3.6/site-packages/apscheduler/executors/base.py", line 71, in submit_job
+                    self._do_submit_job(job, run_times)
+                File "./collector.py", line 92, in _do_submit_job
+                File "/usr/local/lib/python3.6/concurrent/futures/process.py", line 452, in submit
+                    raise BrokenProcessPool('A child process terminated '
+                concurrent.futures.process.BrokenProcessPool: A child process terminated abruptly, the process pool is not usable anymore
+            -----
+
+            The idea is that we remember that we are in this state, so that we can make Docker health check fail.
+        """
+        super()._run_job_error(job_id, exc, traceback)
+
+        if 'BrokenProcessPool' in exc.__class__.__name__:
+            # this file is checked by the Docker health check and if it exists, container should be restarted:
+            open('/tmp/fail_health_check', 'a').close()
+
 
 class Collector(object):
     __slots__ = 'backend_url', 'bot_token', 'scheduler', 'known_jobs', 'jobs_refresh_interval'
