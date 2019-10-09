@@ -32,11 +32,21 @@ services:
     # so that Docker networking is bypassed.
     network_mode: "host"
 
+
   redis:
     image: redis:5-alpine
     container_name: grafolean-collector-snmp-redis
     ports:
-      - "127.0.0.1:6379:6379"
-    # We advise not to use `network_mode: "host"` in production, because it would expose Redis to host network
-    # (even if access is limited to 127.0.0.1).
+      - "6379:6379"
+    # We advise not to use `network_mode: "host"` in production, because it would expose Redis to the network.
     network_mode: "host"
+
+
+  autoheal:
+    image: willfarrell/autoheal
+    container_name: autoheal-snmp
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
