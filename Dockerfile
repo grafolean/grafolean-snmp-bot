@@ -40,5 +40,6 @@ RUN \
     echo "alias l='ls -altr'" >> /root/.bashrc
 COPY --from=build-backend /snmpcollector/ /snmpcollector/
 WORKDIR /snmpcollector
-HEALTHCHECK --interval=10s --retries=1 CMD /bin/bash -c "[ ! -f /tmp/fail_health_check ]"
+# check for "fail" file and if it exists, remove it and fail the check:
+HEALTHCHECK --interval=10s --retries=1 CMD /bin/bash -c "[ ! -f /tmp/fail_health_check ] || ( rm /tmp/fail_health_check && exit 1 )"
 CMD ["python", "-m", "snmpcollector"]
