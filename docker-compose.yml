@@ -22,7 +22,7 @@ services:
       # To use SNMP Collector, a bot with the protocol "snmp" must be added via user interface, then the token needs to be copied here:
       - BOT_TOKEN=${BOT_TOKEN}
       # Interval between fetching information about jobs:
-      - JOBS_REFRESH_INTERVAL=60
+      - JOBS_REFRESH_INTERVAL=${JOBS_REFRESH_INTERVAL:-60}
       - REDIS_HOST=redis
     restart: always
 
