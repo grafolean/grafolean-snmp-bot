@@ -18,9 +18,9 @@ services:
       # - BACKEND_URL=https://grafolean.com/api
       # IMPORTANT: '127.0.0.1' and 'localhost' are _never_ correct addresses for Grafolean backend, because they translate
       # to container, not host.
-      - BACKEND_URL=
+      - BACKEND_URL=${BACKEND_URL}
       # To use SNMP Collector, a bot with the protocol "snmp" must be added via user interface, then the token needs to be copied here:
-      - BOT_TOKEN=
+      - BOT_TOKEN=${BOT_TOKEN}
       # Interval between fetching information about jobs:
       - JOBS_REFRESH_INTERVAL=60
       - REDIS_HOST=redis
