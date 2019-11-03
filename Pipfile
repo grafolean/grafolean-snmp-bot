@@ -17,6 +17,7 @@ mathjspy = "*"
 numpy = "*"
 redis = "*"
 python-slugify = "*"
+grafoleancollector = "*"
 
 [requires]
 python_version = "3.6"
