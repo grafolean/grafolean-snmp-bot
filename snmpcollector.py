@@ -13,7 +13,7 @@ from easysnmp import Session, SNMPVariable
 from mathjspy import MathJS
 from slugify import slugify
 
-from collector import Collector
+from grafoleancollector import Collector
 
 
 logging.basicConfig(format='%(asctime)s | %(levelname)s | %(message)s',
