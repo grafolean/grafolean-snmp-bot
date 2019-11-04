@@ -245,10 +245,7 @@ class SNMPCollector(Collector):
             ipv4=job_info["details"]["ipv4"],
         ))
 
-        # filter out only those sensors that are supposed to run at this interval:
-        affecting_intervals, = args
-
-        # initialize session:
+        # initialize SNMP session:
         session_kwargs = {
             "hostname": job_info["details"]["ipv4"],
             "use_numeric": True,
@@ -270,9 +267,10 @@ class SNMPCollector(Collector):
             }
         else:
             raise Exception("Invalid SNMP version")
-
         session = Session(**session_kwargs)
 
+        # filter out only those sensors that are supposed to run at this interval:
+        affecting_intervals, = args
         activated_sensors = [s for s in job_info["sensors"] if s["interval"] in affecting_intervals]
         for sensor in activated_sensors:
             results = []
