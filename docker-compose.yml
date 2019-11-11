@@ -25,12 +25,16 @@ services:
       - JOBS_REFRESH_INTERVAL=${JOBS_REFRESH_INTERVAL:-60}
       - REDIS_HOST=redis
     restart: always
+    networks:
+      - grafolean
 
 
   redis:
     image: redis:5-alpine
     container_name: grafolean-collector-snmp-redis
     restart: always
+    networks:
+      - grafolean
 
 
   autoheal:
@@ -42,3 +46,12 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: always
+    networks:
+      - grafolean
+
+
+# If running on the same host, join the Grafolean network, so we can reach Grafolean
+# backend at address grafolean:80.
+networks:
+  grafolean:
+    name: grafolean
