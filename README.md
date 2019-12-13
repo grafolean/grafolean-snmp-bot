@@ -1,16 +1,16 @@
-# About Grafolean SNMP Collector
+# About Grafolean SNMP bot
 
-This package is a SNMP Collector for Grafolean, an easy to use generic monitoring system.
+This package is a SNMP bot for Grafolean, an easy to use generic monitoring system.
 
 Once installed, all the configuration of SNMP sensors is done through Grafolean's web-based user interface. Depending on permissions,
-a single SNMP Collector instance can be fetching data for multiple accounts and entities. The fetching intervals can be specified with
+a single SNMP bot instance can be fetching data for multiple accounts and entities. The fetching intervals can be specified with
 up to a second precision.
 
 Under the hood it uses [net-snmp](http://net-snmp.sourceforge.net/) (via [easysnmp](https://easysnmp.readthedocs.io)), which means
 it should be compatible with any device that can respond to requests by `snmpget` and `snmpwalk`.
 
 Requirements:
-- the devices that should be queried via SNMP must be accessible *from the container* (make sure SNMP Collector is installed in correct network and that there are no firewalls in between)
+- the devices that should be queried via SNMP must be accessible *from the container* (make sure that SNMP bot is installed in the correct network and that there are no firewalls in between)
 - Grafolean must be accessible via HTTP(S)
 
 Current limitations:
@@ -21,9 +21,9 @@ Current limitations:
 # License
 
 License is Commons Clause license (on top of Apache 2.0) - source is available, you can use it for free (commercially too), modify and
-share, but you can't sell it. See [LICENSE.md](https://gitlab.com/grafolean/grafolean-collector-snmp/blob/master/LICENSE.md) for details.
+share, but you can't sell it. See [LICENSE.md](https://github.com/grafolean/grafolean-snmp-bot/blob/master/LICENSE.md) for details.
 
-If in doubt, please [open an issue](https://gitlab.com/grafolean/grafolean-collector-snmp/issues) to get further clarification.
+If in doubt, please [open an issue](https://github.com/grafolean/grafolean-snmp-bot/issues) to get further clarification.
 
 # Install (docker / docker-compose)
 
@@ -31,11 +31,11 @@ Docker is the easiest and currently the only officially supported way. Note that
 
 1) log in to Grafolean service (either https://grafolean.com/ or self-hosted), select an appropriate `Account` and create a new `Bot`. Make sure that selected protocol is `SNMP`. Copy the bot token.
 
-2) save [docker-compose.yml](https://gitlab.com/grafolean/grafolean-collector-snmp/raw/master/docker-compose.yml) to a local file:
+2) save [docker-compose.yml](https://github.com/grafolean/grafolean-snmp-bot/raw/master/docker-compose.yml) to a local file:
     ```
     $ mkdir ~/snmpbot
     $ cd ~/snmpbot
-    $ wget https://gitlab.com/grafolean/grafolean-collector-snmp/raw/master/docker-compose.yml
+    $ wget https://github.com/grafolean/grafolean-snmp-bot/raw/master/docker-compose.yml
     ```
 
 3) edit `docker-compose.yml` and change:
@@ -46,7 +46,7 @@ Docker is the easiest and currently the only officially supported way. Note that
 
 4) run: `docker-compose up -d`
 
-If you get no error, congratulations! Everything else is done from within the Grafolean UI. You can however check the status of container as usually by running `docker ps` and investigate logs by running `docker logs -f grafolean-collector-snmp`.
+If you get no error, congratulations! Everything else is done from within the Grafolean UI. You can however check the status of container as usually by running `docker ps` and investigate logs by running `docker logs -f grafolean-snmp-bot`.
 
 In case of error make sure that the user is allowed to run `docker` (that is, that it is in `docker` group) by running `docker ps`. Alternatively, container can be run using `sudo` (line 4 then reads `sudo docker-compose up -d`).
 
@@ -62,7 +62,7 @@ Upgrading should be easy:
 
 Container logs can be checked by running:
 ```
-$ docker logs --since 5m -f grafolean-collector-snmp
+$ docker logs --since 5m -f grafolean-snmp-bot
 ```
 
 ## Building locally
@@ -82,4 +82,4 @@ To contribute to this repository, CLA needs to be signed. Please open an issue a
 
 ## Issues
 
-If you encounter any problems installing or running the software, please let us know in the [issues](https://gitlab.com/grafolean/grafolean-collector-snmp/issues). Please make an effort when describing the issue. If we can reproduce the problem, we can also fix it much faster.
+If you encounter any problems installing or running the software, please let us know in the [issues](https://github.com/grafolean/grafolean-snmp-bot/issues). Please make an effort when describing the issue. If we can reproduce the problem, we can also fix it much faster.

@@ -21,10 +21,10 @@ ARG VCS_REF
 ARG BUILD_DATE
 LABEL org.label-schema.vendor="Grafolean" \
       org.label-schema.url="https://grafolean.com/" \
-      org.label-schema.name="Grafolean SNMP Collector" \
-      org.label-schema.description="SNMP collector for Grafolean" \
+      org.label-schema.name="Grafolean SNMP bot" \
+      org.label-schema.description="SNMP bot for Grafolean" \
       org.label-schema.version=$VERSION \
-      org.label-schema.vcs-url="https://gitlab.com/grafolean/grafolean-collector-snmp/" \
+      org.label-schema.vcs-url="https://github.com/grafolean/grafolean-snmp-bot/" \
       org.label-schema.vcs-ref=$VCS_REF \
       org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.docker.schema-version="1.0"
