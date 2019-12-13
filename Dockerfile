@@ -1,13 +1,13 @@
 FROM python:3.6-slim-stretch as python-requirements
-COPY ./Pipfile ./Pipfile.lock /snmpcollector/
-WORKDIR /snmpcollector
+COPY ./Pipfile ./Pipfile.lock /snmpbot/
+WORKDIR /snmpbot
 RUN \
     pip install pipenv && \
     pipenv lock -r > /requirements.txt
 
 FROM python:3.6-slim-stretch as build-backend
-COPY ./ /snmpcollector/
-WORKDIR /snmpcollector
+COPY ./ /snmpbot/
+WORKDIR /snmpbot
 RUN \
     find ./ ! -name '*.py' -type f -exec rm '{}' ';' && \
     rm -rf tests/ .vscode/ .pytest_cache/ __pycache__/ && \
@@ -38,8 +38,8 @@ RUN \
     apt-get autoremove --yes && \
     rm -rf /var/lib/{apt,dpkg,cache,log}/ && \
     echo "alias l='ls -altr'" >> /root/.bashrc
-COPY --from=build-backend /snmpcollector/ /snmpcollector/
-WORKDIR /snmpcollector
+COPY --from=build-backend /snmpbot/ /snmpbot/
+WORKDIR /snmpbot
 # check for "fail" file and if it exists, remove it and fail the check:
 HEALTHCHECK --interval=10s --retries=1 CMD /bin/bash -c "[ ! -f /tmp/fail_health_check ] || ( rm /tmp/fail_health_check && exit 1 )"
-CMD ["python", "-m", "snmpcollector"]
+CMD ["python", "-m", "snmpbot"]

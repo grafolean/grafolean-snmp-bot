@@ -22,7 +22,7 @@ pytest:
     - pipenv install --dev
   script:
     - export REDIS_HOST="redis"
-    - pipenv run pytest -x test_snmpcollector.py
+    - pipenv run pytest -x test_snmpbot.py
 
 deploy to docker hub:
   stage: deploy

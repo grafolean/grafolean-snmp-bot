@@ -33,8 +33,8 @@ Docker is the easiest and currently the only officially supported way. Note that
 
 2) save [docker-compose.yml](https://gitlab.com/grafolean/grafolean-collector-snmp/raw/master/docker-compose.yml) to a local file:
     ```
-    $ mkdir ~/snmpcollector
-    $ cd ~/snmpcollector
+    $ mkdir ~/snmpbot
+    $ cd ~/snmpbot
     $ wget https://gitlab.com/grafolean/grafolean-collector-snmp/raw/master/docker-compose.yml
     ```
 

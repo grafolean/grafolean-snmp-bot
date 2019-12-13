@@ -8,7 +8,7 @@ services:
   # the settings appropriately.
   #
 
-  snmpcollector:
+  snmpbot:
     # If you wish to load an explicit version, change the next line. For example:
     #   image: grafolean/grafolean-collector-snmp:v1.0.0
     image: grafolean/grafolean-collector-snmp

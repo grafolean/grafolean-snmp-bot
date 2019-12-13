@@ -1,7 +1,7 @@
 from easysnmp import SNMPVariable
 import pytest
 
-from snmpcollector import _apply_expression_to_results, _convert_counters_to_values, _construct_output_path
+from snmpbot import _apply_expression_to_results, _convert_counters_to_values, _construct_output_path
 
 
 def test_apply_expression_snmpget():
