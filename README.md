@@ -25,11 +25,11 @@ share, but you can't sell it. See [LICENSE.md](https://github.com/grafolean/graf
 
 If in doubt, please [open an issue](https://github.com/grafolean/grafolean-snmp-bot/issues) to get further clarification.
 
-# Install (docker / docker-compose)
+# Install
 
-Docker is the easiest and currently the only officially supported way. Note that while instructions might (with possibly some modifications) work on other operating systems, Linux is assumed.
+Requirements: `docker` and `docker-compose`.
 
-1) log in to Grafolean service (either https://grafolean.com/ or self-hosted), select an appropriate `Account` and create a new `Bot`. Make sure that selected protocol is `SNMP`. Copy the bot token.
+1) log in to Grafolean service (either self-hosted or https://grafolean.com/) and create a new `Bot`. Make sure that selected protocol is `SNMP`. Copy the bot token.
 
 2) save [docker-compose.yml](https://github.com/grafolean/grafolean-snmp-bot/raw/master/docker-compose.yml) to a local file:
     ```
@@ -42,6 +42,7 @@ Docker is the easiest and currently the only officially supported way. Note that
     - mandatory: `BACKEND_URL` (set to the URL of Grafolean backend, for example `https://grafolean.com/api`),
     - mandatory: `BOT_TOKEN` (set to the bot token from step 1),
     - optional: `JOBS_REFRESH_INTERVAL` (interval in seconds at which the jobs definitions will be updated)
+
    Alternatively, you can also copy `.env.example` to `.env` and change settings there (leaving `docker-compose.yml` in original state).
 
 4) run: `docker-compose up -d`
@@ -51,8 +52,6 @@ If you get no error, congratulations! Everything else is done from within the Gr
 In case of error make sure that the user is allowed to run `docker` (that is, that it is in `docker` group) by running `docker ps`. Alternatively, container can be run using `sudo` (line 4 then reads `sudo docker-compose up -d`).
 
 ## Upgrade
-
-Upgrading should be easy:
 
 1) `$ docker-compose pull`
 2) `$ docker-compose down`
@@ -67,18 +66,18 @@ $ docker logs --since 5m -f grafolean-snmp-bot
 
 ## Building locally
 
-If you wish to build the Docker image locally (for debugging or for development purposes), you can specify a custom docker-compose YAML file:
+If you wish to build the Docker image locally (for debugging or for development purposes), you can use a custom docker-compose YAML file:
 ```
 docker-compose -f docker-compose.dev.yml build
 ```
 
-In this case `.env.example` can be copied to `.env` and all settings can be altered there, which helps us avoid commiting settings to the repository.
+In this case `.env.example` can be copied to `.env` and all settings can be altered there.
 
 # Development
 
 ## Contributing
 
-To contribute to this repository, CLA needs to be signed. Please open an issue about the problem you are facing before submitting a pull request.
+CLA needs to be signed to contribute to this repository. Please open an issue about the problem you are facing before submitting a pull request.
 
 ## Issues
 
