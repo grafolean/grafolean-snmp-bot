@@ -199,6 +199,9 @@ class SNMPBot(Collector):
     def do_snmp(*args, **job_info):
         """
             {
+                "backend_url": "...",
+                "bot_token: "...",
+                "account_id": 123,
                 "entity_id": 1348300224,
                 "name": "localhost",
                 "entity_type": "device",
@@ -221,6 +224,7 @@ class SNMPBot(Collector):
                             "expression": "$1",
                             "output_path": "lm-sensors"
                         },
+                        "sensor_id": ...,
                         "interval": 30
                     },
                     {
@@ -234,10 +238,10 @@ class SNMPBot(Collector):
                             "expression": "$1",
                             "output_path": "lmsensorscore3"
                         },
+                        "sensor_id": ...,
                         "interval": 20
                     }
-                ],
-                "account_id": 1
+                ]
             }
         """
         log.info("Running job for account [{account_id}], IP [{ipv4}]".format(
