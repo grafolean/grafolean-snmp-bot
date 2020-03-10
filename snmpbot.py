@@ -276,6 +276,7 @@ class SNMPBot(Collector):
         # filter out only those sensors that are supposed to run at this interval:
         affecting_intervals, = args
         activated_sensors = [s for s in job_info["sensors"] if s["interval"] in affecting_intervals]
+        values = []
         for sensor in activated_sensors:
             results = []
             oids = [o["oid"] for o in sensor["sensor_details"]["oids"]]
@@ -301,8 +302,10 @@ class SNMPBot(Collector):
             # GET was used, we get one.
             expression = sensor["sensor_details"]["expression"]
             output_path = f'entity.{job_info["entity_id"]}.snmp.{sensor["sensor_details"]["output_path"]}'
-            values = _apply_expression_to_results(results_no_counters, methods, expression, output_path)
-            send_results_to_grafolean(job_info['backend_url'], job_info['bot_token'], job_info['account_id'], values)
+            new_values = _apply_expression_to_results(results_no_counters, methods, expression, output_path)
+            values.extend(new_values)
+
+        send_results_to_grafolean(job_info['backend_url'], job_info['bot_token'], job_info['account_id'], values)
 
 
     def jobs(self):
