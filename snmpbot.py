@@ -37,6 +37,10 @@ REDIS_HOST = os.environ.get('REDIS_HOST', '127.0.0.1')
 r = redis.Redis(host=REDIS_HOST)
 
 
+OID_IF_DESCR = '1.3.6.1.2.1.2.2.1.2'
+OID_IF_SPEED = '1.3.6.1.2.1.2.2.1.5'
+
+
 def _get_previous_counter_value(counter_ident):
     prev_value = r.hgetall(counter_ident)
     if not prev_value:  # empty dict
@@ -196,6 +200,33 @@ def send_results_to_grafolean(backend_url, bot_token, account_id, values):
 class SNMPBot(Collector):
 
     @staticmethod
+    def _create_snmp_sesssion(job_info):
+        # initialize SNMP session:
+        session_kwargs = {
+            "hostname": job_info["details"]["ipv4"],
+            "use_numeric": True,
+        }
+        cred = job_info["credential_details"]
+        snmp_version = int(cred["version"][5:6])
+        session_kwargs["version"] = snmp_version
+        if snmp_version in [1, 2]:
+            session_kwargs["community"] = cred["snmpv12_community"]
+        elif snmp_version == 3:
+            session_kwargs = {
+                **session_kwargs,
+                "security_username": cred["snmpv3_securityName"],
+                "security_level": cred["snmpv3_securityLevel"],  # easysnmp supports camelCase level names too
+                "privacy_protocol": cred.get("snmpv3_privProtocol", 'DEFAULT'),
+                "privacy_password": cred.get("snmpv3_privKey", ''),
+                "auth_protocol": cred.get("snmpv3_authProtocol", 'DEFAULT'),
+                "auth_password": cred.get("snmpv3_authKey", ''),
+            }
+        else:
+            raise Exception("Invalid SNMP version")
+        session = Session(**session_kwargs)
+        return session
+
+    @staticmethod
     def do_snmp(*args, **job_info):
         """
             {
@@ -249,29 +280,7 @@ class SNMPBot(Collector):
             ipv4=job_info["details"]["ipv4"],
         ))
 
-        # initialize SNMP session:
-        session_kwargs = {
-            "hostname": job_info["details"]["ipv4"],
-            "use_numeric": True,
-        }
-        cred = job_info["credential_details"]
-        snmp_version = int(cred["version"][5:6])
-        session_kwargs["version"] = snmp_version
-        if snmp_version in [1, 2]:
-            session_kwargs["community"] = cred["snmpv12_community"]
-        elif snmp_version == 3:
-            session_kwargs = {
-                **session_kwargs,
-                "security_username": cred["snmpv3_securityName"],
-                "security_level": cred["snmpv3_securityLevel"],  # easysnmp supports camelCase level names too
-                "privacy_protocol": cred.get("snmpv3_privProtocol", 'DEFAULT'),
-                "privacy_password": cred.get("snmpv3_privKey", ''),
-                "auth_protocol": cred.get("snmpv3_authProtocol", 'DEFAULT'),
-                "auth_password": cred.get("snmpv3_authKey", ''),
-            }
-        else:
-            raise Exception("Invalid SNMP version")
-        session = Session(**session_kwargs)
+        session = SNMPBot._create_snmp_sesssion(job_info)
 
         # filter out only those sensors that are supposed to run at this interval:
         affecting_intervals, = args
@@ -308,6 +317,88 @@ class SNMPBot(Collector):
         send_results_to_grafolean(job_info['backend_url'], job_info['bot_token'], job_info['account_id'], values)
 
 
+    @staticmethod
+    def update_if_entities(*args, **job_info):
+        log.info("Running interfaces job for account [{account_id}], IP [{ipv4}]".format(
+            account_id=job_info["account_id"],
+            ipv4=job_info["details"]["ipv4"],
+        ))
+
+        session = SNMPBot._create_snmp_sesssion(job_info)
+
+        parent_entity_id = job_info["entity_id"]
+        account_id = job_info["account_id"]
+        backend_url = job_info['backend_url']
+        bot_token = job_info['bot_token']
+        # fetch interfaces and update the interface entities:
+        result_descr = session.walk(OID_IF_DESCR)
+        result_speed = session.walk(OID_IF_SPEED)
+
+        # make sure that indexes of results are aligned - we don't want to have incorrect data:
+        if any([if_speed.oid_index != if_descr.oid_index for if_descr, if_speed in zip(result_descr, result_speed)]):
+            log.warning(f"Out-of-order results for interface names on entity {parent_entity_id}, sorting not yet implemented, bailing out!")
+            return
+
+        # - get those entities on this account, which have this entity as their parent and filter them by type ('interface')
+        requests_session = requests.Session()
+        url = f'{backend_url}/accounts/{account_id}/entities/?parent={parent_entity_id}&entity_type=interface&b={bot_token}'
+        r = requests_session.get(url)
+        r.raise_for_status()
+        # existing_entities = {x['details']['snmp_index']: (x['name'], x['details']['speed_bps'], x['id'],) for x in r.json()['list']}
+        # Temporary, until we implement filtering in API:
+        existing_entities = {x['details']['snmp_index']: (x['name'], x['details']['speed_bps'], x['id'],) for x in r.json()['list'] if x["entity_type"] == 'interface' and x["parent"] == parent_entity_id}
+
+        for if_descr_snmpvalue, if_speed_snmpvalue in zip(result_descr, result_speed):
+            oid_index = if_descr_snmpvalue.oid_index
+            descr = if_descr_snmpvalue.value
+            speed_bps = if_speed_snmpvalue.value
+            # - for each new entity:
+            #   - make sure it exists (if not, create it - POST)
+            if oid_index not in existing_entities:
+                log.debug(f"Entity with OID index {oid_index} is new, inserting.")
+                url = f'{backend_url}/accounts/{account_id}/entities/?b={bot_token}'
+                payload = {
+                    "name": descr,
+                    "entity_type": "interface",
+                    "parent": parent_entity_id,
+                    "details":{
+                        "snmp_index": oid_index,
+                        "speed_bps": speed_bps,
+                    },
+                }
+                r = requests_session.post(url, json=payload)
+                continue
+
+            #   - make sure the description and speed are correct (if not, update them - PUT)
+            existing_descr, existing_speed, existing_id = existing_entities[oid_index]
+            if existing_descr != descr or existing_speed != speed_bps:
+                log.debug(f"Entity with OID index {oid_index} changed data, updating.")
+                url = f'{backend_url}/accounts/{account_id}/entities/{existing_id}/?b={bot_token}'
+                payload = {
+                    "name": descr,
+                    "entity_type": "interface",
+                    # "parent": parent_entity_id,  # changing entity parent is not possible
+                    "details":{
+                        "snmp_index": oid_index,
+                        "speed_bps": speed_bps,
+                    },
+                }
+                r = requests_session.put(url, json=payload)
+                del existing_entities[oid_index]
+                continue
+
+            #   - mark it as processed
+            log.debug(f"Entity with OID index {oid_index} didn't change.")
+            del existing_entities[oid_index]
+
+        # - for every existing entity that is not among the new ones, remove it (no point in keeping it - we don't keep old versions of enities data either)
+        for oid_index in existing_entities:
+            _, _, existing_id = existing_entities[oid_index]
+            log.debug(f"Entity with OID index {oid_index} no longer exists, removing.")
+            url = f'{backend_url}/accounts/{account_id}/entities/{existing_id}/?b={bot_token}'
+            r = requests_session.delete(url)
+
+
     def jobs(self):
         """
             Each entity (device) is a single job, no matter how many sensors it has. The reason is
@@ -316,8 +407,14 @@ class SNMPBot(Collector):
         for entity_info in self.fetch_job_configs('snmp'):
             intervals = list(set([sensor_info["interval"] for sensor_info in entity_info["sensors"]]))
             job_info = { **entity_info, "backend_url": self.backend_url, "bot_token": self.bot_token }
-            job_id = str(entity_info["entity_id"])
+            job_id = f'{entity_info["entity_id"]}'
             yield job_id, intervals, SNMPBot.do_snmp, job_info
+
+            # We also collect interface data from each entity; the assumption is that everyone who wants
+            # to use SNMP also wants to know about network interfaces.
+            # Since `job_info` has all the necessary data, we simply pass it along:
+            job_id = f'{entity_info["entity_id"]}-interfaces'
+            yield job_id, [5*60], SNMPBot.update_if_entities, job_info
 
 
 def wait_for_grafolean(backend_url):
