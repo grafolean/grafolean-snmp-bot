@@ -23,31 +23,49 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       # Interval between fetching information about jobs:
       - JOBS_REFRESH_INTERVAL=${JOBS_REFRESH_INTERVAL:-60}
-      - REDIS_HOST=redis
+      - DB_HOST=db
+      - DB_DATABASE=${DB_NAME:-grafolean}
+      - DB_USERNAME=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASS:-admin}
     restart: always
     networks:
       - grafolean
 
 
-  redis:
-    image: redis:5-alpine
-    container_name: grafolean-snmp-bot-redis
-    restart: always
-    networks:
-      - grafolean
-
-
-  autoheal:
-    # This container automatically restarts any container that fails its health check. Not a bullet-proof solution, but better than nothing.
-    image: willfarrell/autoheal
-    container_name: grafolean-snmp-bot-autoheal
-    environment:
-      - AUTOHEAL_CONTAINER_LABEL=all
+  db:
+    image: postgres:12.1-alpine
+    container_name: grafolean-snmp-db
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      # You should always save DB data to a host directory unless you are prepared to lose it. By default
+      # this the location of data is '/grafolean/db/'.
+      # Note that if you ever wish to copy this directory as backup, you need to stop grafolean
+      # container first. For alternative backup approaches consult PostgreSQL documentation.
+      - ${DB_DIR:-/grafolean/snmp-db/}:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=${DB_NAME:-grafolean}
+      - POSTGRES_USER=${DB_USER:-admin}
+      - POSTGRES_PASSWORD=${DB_PASS:-admin}
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h db -t 1 -q"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - grafolean
+
+
+  # autoheal:
+  #   # This container automatically restarts any container that fails its health check. Not a bullet-proof solution, but better than nothing.
+  #   image: willfarrell/autoheal
+  #   container_name: grafolean-snmp-bot-autoheal
+  #   environment:
+  #     - AUTOHEAL_CONTAINER_LABEL=all
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   restart: always
+  #   networks:
+  #     - grafolean
 
 
 # If running on the same host, join the Grafolean network, so we can reach Grafolean

@@ -6,7 +6,6 @@ import time
 from pytz import utc
 from colors import color
 import requests
-import redis
 import re
 
 from easysnmp import Session, SNMPVariable
@@ -14,6 +13,7 @@ from mathjspy import MathJS
 from slugify import slugify
 
 from grafoleancollector import Collector
+from dbutils import get_db_cursor, DB_PREFIX, migrate_if_needed
 
 
 logging.basicConfig(format='%(asctime)s | %(levelname)s | %(message)s',
@@ -33,23 +33,24 @@ class InvalidOutputPath(Exception):
     pass
 
 
-REDIS_HOST = os.environ.get('REDIS_HOST', '127.0.0.1')
-r = redis.Redis(host=REDIS_HOST)
-
-
 OID_IF_DESCR = '1.3.6.1.2.1.2.2.1.2'
 OID_IF_SPEED = '1.3.6.1.2.1.2.2.1.5'
 
 
 def _get_previous_counter_value(counter_ident):
-    prev_value = r.hgetall(counter_ident)
-    if not prev_value:  # empty dict
-        return None, None
-    return int(prev_value[b'v']), float(prev_value[b't'])
+    with get_db_cursor() as c:
+        c.execute(f'SELECT value, ts FROM {DB_PREFIX}bot_counters WHERE id = %s;', (counter_ident,))
+        rec = c.fetchone()
+        if not rec:
+            return None, None
+        v, t = rec
+        return int(v), float(t)
 
 
 def _save_current_counter_value(new_value, now, counter_ident):
-    r.hmset(counter_ident, {b'v': new_value, b't': now})
+    with get_db_cursor() as c:
+        c.execute(f"INSERT INTO {DB_PREFIX}bot_counters (id, value, ts) VALUES (%s, %s, %s) ON CONFLICT (id) DO UPDATE SET value = %s, ts = %s;",
+                (counter_ident, new_value, now, new_value, now))
 
 
 def _convert_counters_to_values(results, now, counter_ident_prefix):
@@ -455,6 +456,8 @@ if __name__ == "__main__":
 
     if not bot_token:
         raise Exception("Please specify BOT_TOKEN / BOT_TOKEN_FROM_FILE env var.")
+
+    migrate_if_needed()
 
     c = SNMPBot(backend_url, bot_token, jobs_refresh_interval)
     c.execute()
