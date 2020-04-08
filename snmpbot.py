@@ -11,6 +11,7 @@ import re
 from easysnmp import Session, SNMPVariable
 from mathjspy import MathJS
 from slugify import slugify
+import psycopg2
 
 from grafoleancollector import Collector
 from dbutils import get_db_cursor, DB_PREFIX, migrate_if_needed
@@ -39,9 +40,13 @@ OID_IF_SPEED = '1.3.6.1.2.1.2.2.1.5'
 
 def _get_previous_counter_value(counter_ident):
     with get_db_cursor() as c:
-        c.execute(f'SELECT value, ts FROM {DB_PREFIX}bot_counters WHERE id = %s;', (counter_ident,))
-        rec = c.fetchone()
-        if not rec:
+        try:
+            c.execute(f'SELECT value, ts FROM {DB_PREFIX}bot_counters WHERE id = %s;', (counter_ident,))
+            rec = c.fetchone()
+            if rec is None:
+                return None, None
+        except psycopg2.ProgrammingError:
+            log.exception(f'Error executing: SELECT value, ts FROM {DB_PREFIX}bot_counters WHERE id = %s; [{counter_ident}]')
             return None, None
         v, t = rec
         return int(v), float(t)
