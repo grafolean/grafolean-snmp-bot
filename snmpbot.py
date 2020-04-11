@@ -14,7 +14,7 @@ from slugify import slugify
 import psycopg2
 
 from grafoleancollector import Collector
-from dbutils import get_db_cursor, DB_PREFIX, migrate_if_needed
+from dbutils import get_db_cursor, DB_PREFIX, migrate_if_needed, db_disconnect
 
 
 logging.basicConfig(format='%(asctime)s | %(levelname)s | %(message)s',
@@ -410,7 +410,6 @@ class SNMPBot(Collector):
             Each entity (device) is a single job, no matter how many sensors it has. The reason is
             that when the intervals align, we can then issue a single SNMP Bulk GET/WALK.
         """
-        migrate_if_needed()
         for entity_info in self.fetch_job_configs('snmp'):
             intervals = list(set([sensor_info["interval"] for sensor_info in entity_info["sensors"]]))
             job_info = { **entity_info, "backend_url": self.backend_url, "bot_token": self.bot_token }
@@ -443,6 +442,9 @@ def wait_for_grafolean(backend_url):
 
 if __name__ == "__main__":
     dotenv.load_dotenv()
+
+    migrate_if_needed()
+    db_disconnect()  # each worker should open their own connection pool
 
     backend_url = os.environ.get('BACKEND_URL')
     jobs_refresh_interval = int(os.environ.get('JOBS_REFRESH_INTERVAL', 120))

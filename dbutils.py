@@ -74,7 +74,16 @@ def db_connect():
                               connect_timeout=connect_timeout)
     except:
         db_pool = None
-        log.error("DB connection failed")
+        log.exception("DB connection failed")
+
+
+def db_disconnect():
+    global db_pool
+    if not db_pool:
+        return
+    db_pool.closeall()
+    db_pool = None
+    log.info("DB connection is closed")
 
 
 ###########################
