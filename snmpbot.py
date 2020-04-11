@@ -410,6 +410,7 @@ class SNMPBot(Collector):
             Each entity (device) is a single job, no matter how many sensors it has. The reason is
             that when the intervals align, we can then issue a single SNMP Bulk GET/WALK.
         """
+        migrate_if_needed()
         for entity_info in self.fetch_job_configs('snmp'):
             intervals = list(set([sensor_info["interval"] for sensor_info in entity_info["sensors"]]))
             job_info = { **entity_info, "backend_url": self.backend_url, "bot_token": self.bot_token }
@@ -461,8 +462,6 @@ if __name__ == "__main__":
 
     if not bot_token:
         raise Exception("Please specify BOT_TOKEN / BOT_TOKEN_FROM_FILE env var.")
-
-    migrate_if_needed()
 
     c = SNMPBot(backend_url, bot_token, jobs_refresh_interval)
     c.execute()
