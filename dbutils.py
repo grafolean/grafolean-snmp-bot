@@ -5,6 +5,7 @@ import os
 import sys
 import copy
 import json
+import time
 
 import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
@@ -21,6 +22,10 @@ logging.addLevelName(logging.ERROR, color('ERR', bg='red'))
 log = logging.getLogger("{}.{}".format(__name__, "dbutils"))
 
 
+class DBConnectionError(Exception):
+    pass
+
+
 db_pool = None
 DB_PREFIX = 'snmp_'
 register_adapter(dict, Json)
@@ -32,24 +37,35 @@ def get_db_connection():
     global db_pool
     if db_pool is None:
         db_connect()
-
     try:
+        if db_pool is None:
+            # connecting to DB failed
+            raise DBConnectionError()
         conn = db_pool.getconn()
+        if conn is None:
+            # pool wasn't able to return a valid connection
+            raise DBConnectionError()
+
         conn.autocommit = True
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         yield conn
+    except DBConnectionError:
+        yield None
     finally:
-        db_pool.putconn(conn)
+        if db_pool is not None and conn is not None:
+            db_pool.putconn(conn)
 
 
 @contextmanager
-def get_db_cursor(commit=False):
+def get_db_cursor():
     with get_db_connection() as connection:
+        if connection is None:
+            yield None
+            return
+
         cursor = connection.cursor()
         try:
             yield cursor
-            if commit:
-                connection.commit()
         finally:
             cursor.close()
 
@@ -74,7 +90,7 @@ def db_connect():
                               connect_timeout=connect_timeout)
     except:
         db_pool = None
-        log.exception("DB connection failed")
+        log.warning("DB connection failed")
 
 
 def db_disconnect():
@@ -84,6 +100,15 @@ def db_disconnect():
     db_pool.closeall()
     db_pool = None
     log.info("DB connection is closed")
+
+
+def initial_wait_for_db():
+    while True:
+        with get_db_cursor() as c:
+            if c is not None:
+                return
+            log.info("DB connection failed - waiting for DB to become available, sleeping 5s")
+            time.sleep(5)
 
 
 ###########################

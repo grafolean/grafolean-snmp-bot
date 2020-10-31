@@ -14,7 +14,7 @@ from slugify import slugify
 import psycopg2
 
 from grafoleancollector import Collector
-from dbutils import get_db_cursor, DB_PREFIX, migrate_if_needed, db_disconnect
+from dbutils import get_db_cursor, DB_PREFIX, initial_wait_for_db, migrate_if_needed, db_disconnect, DBConnectionError
 
 
 logging.basicConfig(format='%(asctime)s | %(levelname)s | %(message)s',
@@ -40,6 +40,8 @@ OID_IF_SPEED = '1.3.6.1.2.1.2.2.1.5'
 
 def _get_previous_counter_value(counter_ident):
     with get_db_cursor() as c:
+        if c is None:
+            raise DBConnectionError()
         try:
             c.execute(f'SELECT value, ts FROM {DB_PREFIX}bot_counters WHERE id = %s;', (counter_ident,))
             rec = c.fetchone()
@@ -54,6 +56,8 @@ def _get_previous_counter_value(counter_ident):
 
 def _save_current_counter_value(new_value, now, counter_ident):
     with get_db_cursor() as c:
+        if c is None:
+            raise DBConnectionError()
         c.execute(f"INSERT INTO {DB_PREFIX}bot_counters (id, value, ts) VALUES (%s, %s, %s) ON CONFLICT (id) DO UPDATE SET value = %s, ts = %s;",
                 (counter_ident, new_value, now, new_value, now))
 
@@ -67,24 +71,28 @@ def _convert_counters_to_values(results, now, counter_ident_prefix):
         if v.snmp_type not in ['COUNTER', 'COUNTER64']:
             new_results.append(v)
             continue
+
         # counter - deal with it:
-        counter_ident = counter_ident_prefix + f'/{i}/{v.oid}/{v.oid_index}'
-        old_value, t = _get_previous_counter_value(counter_ident)
         new_value = int(float(v.value))
-        _save_current_counter_value(new_value, now, counter_ident)
-        if old_value is None:
-            new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
-            continue
+        counter_ident = counter_ident_prefix + f'/{i}/{v.oid}/{v.oid_index}'
+        try:
+            old_value, t = _get_previous_counter_value(counter_ident)
+            _save_current_counter_value(new_value, now, counter_ident)
+            if old_value is None:
+                new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
+                continue
 
-        # it seems like the counter overflow happened, discard result:
-        if new_value < old_value:
-            new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
-            log.warning(f"Counter overflow detected for oid {v.oid}, oid index {v.oid_index}, discarding value - if this happens often, consider using OIDS with 64bit counters (if available) or decreasing polling interval.")
-            continue
+            # it seems like the counter overflow happened, discard result:
+            if new_value < old_value:
+                new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=None, snmp_type='COUNTER_PER_S'))
+                log.warning(f"Counter overflow detected for oid {v.oid}, oid index {v.oid_index}, discarding value - if this happens often, consider using OIDS with 64bit counters (if available) or decreasing polling interval.")
+                continue
 
-        dt = now - t
-        dv = (new_value - old_value) / dt
-        new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=dv, snmp_type='COUNTER_PER_S'))
+            dt = now - t
+            dv = (new_value - old_value) / dt
+            new_results.append(SNMPVariable(oid=v.oid, oid_index=v.oid_index, value=dv, snmp_type='COUNTER_PER_S'))
+        except DBConnectionError:
+            log.error(f"Could not convert counter due to DB error: {counter_ident} / {new_value}")
     return new_results
 
 
@@ -443,6 +451,7 @@ def wait_for_grafolean(backend_url):
 if __name__ == "__main__":
     dotenv.load_dotenv()
 
+    initial_wait_for_db()
     migrate_if_needed()
     db_disconnect()  # each worker should open their own connection pool
 
