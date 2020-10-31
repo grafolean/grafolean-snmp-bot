@@ -13,6 +13,9 @@ services:
     #   image: grafolean/grafolean-snmp-bot:v1.0.0
     image: grafolean/grafolean-snmp-bot
     container_name: grafolean-snmp-bot
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
       # Backend url must be set to the address of the Grafolean backend, for example this uses Grafolean hosted service:
       # - BACKEND_URL=https://grafolean.com/api
