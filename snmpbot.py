@@ -40,8 +40,6 @@ OID_IF_SPEED = '1.3.6.1.2.1.2.2.1.5'
 
 def _get_previous_counter_value(counter_ident):
     with get_db_cursor() as c:
-        if c is None:
-            raise DBConnectionError()
         try:
             c.execute(f'SELECT value, ts FROM {DB_PREFIX}bot_counters WHERE id = %s;', (counter_ident,))
             rec = c.fetchone()
@@ -56,8 +54,6 @@ def _get_previous_counter_value(counter_ident):
 
 def _save_current_counter_value(new_value, now, counter_ident):
     with get_db_cursor() as c:
-        if c is None:
-            raise DBConnectionError()
         c.execute(f"INSERT INTO {DB_PREFIX}bot_counters (id, value, ts) VALUES (%s, %s, %s) ON CONFLICT (id) DO UPDATE SET value = %s, ts = %s;",
                 (counter_ident, new_value, now, new_value, now))
 
