@@ -31,9 +31,9 @@ LABEL org.label-schema.vendor="Grafolean" \
 COPY --from=python-requirements /requirements.txt /requirements.txt
 RUN \
     apt-get update && \
-    apt-get install --no-install-recommends -q -y libsnmp-dev build-essential git && \
+    apt-get install --no-install-recommends -q -y libsnmp-dev build-essential libpq-dev python3-dev git && \
     pip install --no-cache-dir -r /requirements.txt && \
-    apt-get purge -y build-essential && \
+    apt-get purge -y build-essential libpq-dev python3-dev && \
     apt-get clean autoclean && \
     apt-get autoremove --yes && \
     rm -rf /var/lib/{apt,dpkg,cache,log}/ && \
