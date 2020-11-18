@@ -428,8 +428,8 @@ class SNMPBot(Collector):
 
 
 def wait_for_grafolean(backend_url):
+    url = '{}/status/info'.format(backend_url)
     while True:
-        url = '{}/status/info'.format(backend_url)
         log.info("Checking Grafolean status...")
         try:
             r = requests.get(url)
@@ -440,7 +440,7 @@ def wait_for_grafolean(backend_url):
                 return
         except:
             pass
-        log.info("Grafolean backend not available / initialized yet, waiting.")
+        log.info(f"Grafolean backend (url: {url}) not available / initialized yet, waiting.")
         time.sleep(10)
 
 
