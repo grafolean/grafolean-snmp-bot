@@ -36,7 +36,7 @@ services:
 
 
   db:
-    image: postgres:12.1-alpine
+    image: timescale/timescaledb:latest-pg12
     container_name: grafolean-snmp-db
     volumes:
       # You should always save DB data to a host directory unless you are prepared to lose it. By default
@@ -50,7 +50,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASS:-admin}
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h db -t 1 -q"]
+      test: ["CMD-SHELL", "pg_isready -h db -U ${DB_USER:-admin} -t 1 -q"]
       interval: 10s
       timeout: 5s
       retries: 3
