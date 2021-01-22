@@ -438,8 +438,8 @@ def wait_for_grafolean(backend_url):
             if status_info['db_migration_needed'] == False and status_info['user_exists'] == True:
                 log.info("Grafolean backend is ready.")
                 return
-        except:
-            pass
+        except Exception as ex:
+            log.info(f"Exception while trying to reach Grafolean backend: {str(ex)}")
         log.info(f"Grafolean backend (url: {url}) not available / initialized yet, waiting.")
         time.sleep(10)
 
